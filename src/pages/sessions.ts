@@ -161,7 +161,7 @@ function renderMessage(msg: SessionMessage): string {
   return `
     <div class="message ${roleClass}">
       <div class="msg-header">
-        <span class="msg-role">${icon} ${roleLabel}</span>
+        <span class="msg-role">${icon} <span class="msg-role-text">${roleLabel}</span></span>
         <span class="msg-meta-info">
           ${tokenCount ? `<span class="msg-tokens">${tokenCount} tokens</span>` : ""}
           ${timestamp ? `<span class="msg-timestamp">${timestamp}</span>` : ""}

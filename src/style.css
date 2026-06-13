@@ -775,6 +775,7 @@ tr:hover td {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
@@ -785,6 +786,14 @@ tr:hover td {
   display: flex;
   align-items: center;
   gap: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.msg-role-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .msg-meta-info {
