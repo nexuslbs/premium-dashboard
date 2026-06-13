@@ -50,7 +50,10 @@ document.querySelectorAll(".mobile-nav-item").forEach((item) => {
 window.addEventListener("popstate", () => {
   const path = location.pathname.slice(1) || "overview";
   document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => {
-    n.classList.toggle("active", n.getAttribute("data-route") === path);
+    const navRoute = n.getAttribute("data-route") || "";
+    // Highlight parent nav for parameterized routes (e.g. "session/xxx" highlights "sessions")
+    const isActive = path === navRoute || path.startsWith(navRoute + "/");
+    n.classList.toggle("active", isActive);
   });
   router.go(path);
 });
@@ -58,7 +61,9 @@ window.addEventListener("popstate", () => {
 // Initial render
 const initialRoute = location.pathname.slice(1) || "overview";
 document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => {
-  n.classList.toggle("active", n.getAttribute("data-route") === initialRoute);
+  const navRoute = n.getAttribute("data-route") || "";
+  const isActive = initialRoute === navRoute || initialRoute.startsWith(navRoute + "/");
+  n.classList.toggle("active", isActive);
 });
 router.go(initialRoute);
 

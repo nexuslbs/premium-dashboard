@@ -26,6 +26,17 @@ export interface Session {
   status: string;
 }
 
+export interface SessionMessage {
+  id: number;
+  session_id: string;
+  role: string;
+  content: string | null;
+  tool_name: string | null;
+  timestamp: number;
+  token_count: number | null;
+  reasoning: string | null;
+}
+
 export interface ContainerInfo {
   name: string;
   image: string;
