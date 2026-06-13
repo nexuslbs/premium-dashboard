@@ -73,7 +73,7 @@ async function loadStats(): Promise<void> {
         <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </div>
     `;
-    drawChart(stats);
+    requestAnimationFrame(() => drawChart(stats));
   } catch (e) {
     grid.innerHTML = `<div class="error-state">Failed to load stats: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
@@ -119,6 +119,10 @@ async function loadQuickInfo(): Promise<void> {
 function drawChart(stats: SystemStats): void {
   const canvas = document.getElementById("resource-chart") as HTMLCanvasElement | null;
   if (!canvas) return;
+  // Ensure canvas has explicit width for proper rendering
+  if (canvas.width === 0) {
+    canvas.style.width = "100%";
+  }
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 

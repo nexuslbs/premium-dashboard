@@ -1,15 +1,53 @@
 import { Router } from "express";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
+import { request as httpRequest } from "http";
 
 export const statsRouter = Router();
 
 function queryDb(sql: string): string {
-  const cmd = `printf ".timeout 3000\\n${sql}\\n" | sqlite3 -json /opt/data/state.db`;
+  const cmd = `printf ".timeout 3000\\\\n${sql}\\\\n" | sqlite3 -json /opt/data/state.db`;
   return execSync(cmd, { timeout: 15, encoding: "utf-8", maxBuffer: 1024 * 1024 });
 }
 
-function getStats() {
+const DOCKER_SOCKET = "/var/run/docker.sock";
+
+interface DockerContainer {
+  State: string;
+}
+
+function dockerApi<T>(path: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        socketPath: DOCKER_SOCKET,
+        path,
+        method: "GET",
+        timeout: 8000,
+        headers: { "Host": "localhost" },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error(`Failed to parse Docker API response: ${data.slice(0, 200)}`));
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("Docker API timeout"));
+    });
+    req.end();
+  });
+}
+
+async function getStats() {
   // CPU
   const cpuInfo = readFileSync("/proc/stat", "utf-8");
   const cpuLine = cpuInfo.split("\n").find((l) => l.startsWith("cpu "));
@@ -40,11 +78,11 @@ function getStats() {
   const uptimeStr = readFileSync("/proc/uptime", "utf-8");
   const uptime = Math.floor(parseFloat(uptimeStr.split(" ")[0] || "0"));
 
-  // Docker
+  // Docker containers (via REST API on Unix socket, not docker CLI)
   let containersRunning = 0;
   try {
-    const ps = execSync("docker ps -q 2>/dev/null | wc -l", { timeout: 5 }).toString().trim();
-    containersRunning = parseInt(ps, 10) || 0;
+    const containers = await dockerApi<DockerContainer[]>("/containers/json?limit=999");
+    containersRunning = containers.filter((c) => c.State === "running").length;
   } catch { /* fallback */ }
 
   // Sessions today from state.db
@@ -73,9 +111,9 @@ function getStats() {
   };
 }
 
-statsRouter.get("/", (_req, res) => {
+statsRouter.get("/", async (_req, res) => {
   try {
-    const stats = getStats();
+    const stats = await getStats();
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
