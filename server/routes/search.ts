@@ -2,6 +2,8 @@ import { Router } from "express";
 
 export const searchRouter = Router();
 
+const WIKI_BASE = "https://hermes-files.nexuslbs.org/opt/data/wiki";
+
 interface SearchQuery {
   query: string;
   limit?: number;
@@ -15,7 +17,6 @@ searchRouter.post("/", async (req, res) => {
   }
 
   try {
-    // Scroll all points from Qdrant collection and filter by text match
     const scrollResponse = await fetch("http://hermes-qdrant:6333/collections/hermes-wiki/points/scroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,7 +35,7 @@ searchRouter.post("/", async (req, res) => {
     const scrollData = await scrollResponse.json() as { result?: { points?: any[] } };
     const points = scrollData.result?.points || [];
 
-    // Filter by case-insensitive substring match on text, file_path, and section_title
+    // Filter by case-insensitive substring match
     const q = query.toLowerCase();
     const matched = points.filter((p: any) => {
       const payload = p.payload || {};
@@ -44,7 +45,7 @@ searchRouter.post("/", async (req, res) => {
       return contentPreview.includes(q) || filePath.includes(q) || sectionTitle.includes(q);
     });
 
-    // Sort by relevance: prefer file_path matches, then section_title matches
+    // Sort by relevance
     matched.sort((a: any, b: any) => {
       const ap = a.payload || {};
       const bp = b.payload || {};
@@ -58,16 +59,20 @@ searchRouter.post("/", async (req, res) => {
     const results = matched.slice(0, limit).map((p: any) => {
       const payload = p.payload || {};
       const contentPreview = payload.content_preview || "";
+      const filePath = payload.file_path || "";
+      // Build wiki URL — strip .md extension for cleaner links
+      const wikiUrl = `${WIKI_BASE}/${filePath}`;
       return {
-        file_path: payload.file_path || "",
+        file_path: filePath,
         section_title: payload.section_title || "",
         score: 0,
         content_preview: contentPreview.substring(0, 200),
+        url: wikiUrl,
       };
     });
 
     res.json(results);
-  } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Unknown error" });
   }
 });

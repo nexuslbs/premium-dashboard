@@ -46,16 +46,16 @@ async function search(query: string): Promise<void> {
         ${results
           .map(
             (r) => `
-          <div class="card" style="cursor:pointer;">
+          <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener" class="card" style="cursor:pointer;text-decoration:none;display:block;">
             <div class="card-body" style="padding:1rem;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
                 <span style="font-size:0.875rem;font-weight:600;color:var(--text-primary);">${escapeHtml(r.section_title)}</span>
                 <span class="badge badge-neutral">${(r.score * 100).toFixed(0)}%</span>
               </div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.375rem;">${escapeHtml(r.file_path)}</div>
+              <div style="font-size:0.75rem;color:var(--accent-cyan);margin-bottom:0.375rem;word-break:break-all;">${escapeHtml(r.url)}</div>
               <div style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.5;">${escapeHtml(r.content_preview.slice(0, 300))}</div>
             </div>
-          </div>
+          </a>
         `
           )
           .join("")}

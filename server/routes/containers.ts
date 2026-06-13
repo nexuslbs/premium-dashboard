@@ -1,61 +1,104 @@
 import { Router } from "express";
-import { execSync } from "child_process";
+import { request as httpRequest } from "http";
 
 export const containersRouter = Router();
 
-interface ContainerRow {
-  name: string;
-  image: string;
-  status: string;
-  state: string;
-  uptime: string;
-  memory: string;
-  ports: string;
+interface DockerContainer {
+  Id: string;
+  Names: string[];
+  Image: string;
+  State: string;
+  Status: string;
+  Ports: { PrivatePort: number; PublicPort: number; Type: string }[];
+  Created: number;
 }
 
-function getContainers(): ContainerRow[] {
+interface DockerStats {
+  name: string;
+  memory_stats?: {
+    usage?: number;
+    limit?: number;
+  };
+}
+
+const SOCKET_PATH = "/var/run/docker.sock";
+
+function dockerApi<T>(path: string, method = "GET"): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        socketPath: SOCKET_PATH,
+        path,
+        method,
+        timeout: 8000,
+        headers: { "Host": "localhost" },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error(`Failed to parse Docker API response: ${data.slice(0, 200)}`));
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("Docker API timeout"));
+    });
+    req.end();
+  });
+}
+
+containersRouter.get("/", async (_req, res) => {
   try {
-    const output = execSync(
-      'docker ps -a --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" --no-trunc 2>/dev/null || echo ""',
-      { timeout: 10 }
-    ).toString().trim();
+    const containers = await dockerApi<DockerContainer[]>("/containers/json?all=true");
 
-    if (!output) return [];
+    // Get stats for running containers
+    let statsMap: Record<string, DockerStats> = {};
+    try {
+      const statsRaw = await dockerApi<any[]>("/containers/json?limit=999");
+      const running = statsRaw.filter((c) => c.State === "running");
+      for (const c of running) {
+        try {
+          const stat = await dockerApi<DockerStats>(`/containers/${c.Id}/stats?stream=false`);
+          statsMap[c.Id] = stat;
+        } catch { /* skip individual stat failures */ }
+      }
+    } catch { /* skip stats entirely */ }
 
-    return output.split("\n").map((line) => {
-      const [name = "", image = "", status = "", ports = ""] = line.split("\t");
-      const state = status.toLowerCase().includes("up") ? "running" :
-                    status.toLowerCase().includes("exited") ? "exited" :
-                    status.toLowerCase().includes("paused") ? "paused" : "unknown";
+    const result = containers.map((c) => {
+      const name = (c.Names?.[0] || "").replace(/^\//, "");
+      const state = c.State || "unknown";
+      const status = c.Status || "";
 
-      // Extract uptime
-      const uptimeMatch = status.match(/(\d+\s+\w+\s+\d+[:\d]*)/);
+      // Format ports
+      const ports = (c.Ports || [])
+        .map((p) => `${p.PublicPort || p.PrivatePort}→${p.PrivatePort}/${p.Type}`)
+        .join(", ");
+
+      // Extract uptime from status string
+      const uptimeMatch = status.match(/(\d+\s+\w+\s+\d+[\d:]*)/);
       const uptime = uptimeMatch ? uptimeMatch[1] : status.slice(0, 30);
 
-      // Memory is approximated from docker stats
+      // Parse memory from Docker stats
+      const stat = statsMap[c.Id];
       let memory = "—";
-      try {
-        const stats = execSync(
-          `docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" 2>/dev/null | grep "^${name}\t" || true`,
-          { timeout: 5 }
-        ).toString().trim();
-        if (stats) {
-          memory = stats.split("\t")[1] || "—";
-        }
-      } catch { /* fallback */ }
+      if (stat?.memory_stats?.usage && stat?.memory_stats?.limit) {
+        const mb = (stat.memory_stats.usage / 1024 / 1024).toFixed(0);
+        const total = (stat.memory_stats.limit / 1024 / 1024).toFixed(0);
+        memory = `${mb}MB / ${total}MB`;
+      }
 
-      return { name, image, status, state, uptime, memory, ports };
+      return { name, image: c.Image, status: c.Status, state, uptime, memory, ports };
     });
-  } catch {
-    return [];
-  }
-}
 
-containersRouter.get("/", (_req, res) => {
-  try {
-    const containers = getContainers();
-    res.json(containers);
-  } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Unknown error" });
   }
 });

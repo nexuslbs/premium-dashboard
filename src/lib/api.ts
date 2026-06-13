@@ -50,6 +50,7 @@ export interface SearchResult {
   section_title: string;
   score: number;
   content_preview: string;
+  url: string;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
