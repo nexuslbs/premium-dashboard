@@ -611,6 +611,7 @@ tr:hover td {
 .mobile-nav-item svg {
   width: 20px;
   height: 20px;
+  flex-shrink: 0;
 }
 
 .mobile-nav-item span {

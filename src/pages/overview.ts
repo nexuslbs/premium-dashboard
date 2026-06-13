@@ -40,37 +40,37 @@ async function loadStats(): Promise<void> {
         <div class="stat-card-label">CPU Usage</div>
         <div class="stat-card-value">${stats.cpu.usage.toFixed(1)}%</div>
         <div class="stat-card-sub">${stats.cpu.cores} cores</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
       </div>
       <div class="stat-card cyan">
         <div class="stat-card-label">Memory</div>
         <div class="stat-card-value">${stats.memory.percent.toFixed(0)}%</div>
         <div class="stat-card-sub">${(stats.memory.used / 1024 / 1024 / 1024).toFixed(1)}G / ${(stats.memory.total / 1024 / 1024 / 1024).toFixed(1)}G</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 10v4"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 10v4"/></svg>
       </div>
       <div class="stat-card amber">
         <div class="stat-card-label">Sessions Today</div>
         <div class="stat-card-value">${stats.sessions_today}</div>
         <div class="stat-card-sub">Agent conversations</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path d="M12 6v6l4 2"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path d="M12 6v6l4 2"/></svg>
       </div>
       <div class="stat-card emerald">
         <div class="stat-card-label">Containers</div>
         <div class="stat-card-value">${stats.containers_running}</div>
         <div class="stat-card-sub">Running</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </div>
       <div class="stat-card blue">
         <div class="stat-card-label">Disk</div>
         <div class="stat-card-value">${stats.disk.percent.toFixed(0)}%</div>
         <div class="stat-card-sub">${(stats.disk.used / 1024 / 1024 / 1024).toFixed(0)}G / ${(stats.disk.total / 1024 / 1024 / 1024).toFixed(0)}G</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
       </div>
       <div class="stat-card rose">
         <div class="stat-card-label">Scheduled Jobs</div>
         <div class="stat-card-value">${stats.cron_jobs}</div>
         <div class="stat-card-sub">Active</div>
-        <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </div>
     `;
     drawChart(stats);
