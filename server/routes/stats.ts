@@ -4,6 +4,11 @@ import { readFileSync } from "fs";
 
 export const statsRouter = Router();
 
+function queryDb(sql: string): string {
+  const cmd = `printf ".timeout 3000\\n${sql}\\n" | sqlite3 -json /opt/data/state.db`;
+  return execSync(cmd, { timeout: 15, encoding: "utf-8", maxBuffer: 1024 * 1024 });
+}
+
 function getStats() {
   // CPU
   const cpuInfo = readFileSync("/proc/stat", "utf-8");
@@ -42,18 +47,15 @@ function getStats() {
     containersRunning = parseInt(ps, 10) || 0;
   } catch { /* fallback */ }
 
-  // Real sessions today from state.db
+  // Sessions today from state.db
   let sessionsToday = 0;
   try {
-    const output = execSync(
-      `sqlite3 -json /opt/data/state.db "SELECT COUNT(*) AS count FROM sessions WHERE datetime(started_at, 'unixepoch') >= date('now')"`,
-      { timeout: 10, encoding: "utf-8" }
-    );
-    const rows = JSON.parse(output);
+    const output = queryDb("SELECT COUNT(*) AS count FROM sessions WHERE datetime(started_at, 'unixepoch') >= date('now')");
+    const rows = JSON.parse(output.trim());
     sessionsToday = rows[0]?.count || 0;
   } catch { /* fallback */ }
 
-  // Real cron job count from jobs.json
+  // Cron job count from jobs.json
   let cronJobs = 0;
   try {
     const data = JSON.parse(readFileSync("/opt/data/cron/jobs.json", "utf-8"));
