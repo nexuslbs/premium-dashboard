@@ -42,9 +42,23 @@ function getStats() {
     containersRunning = parseInt(ps, 10) || 0;
   } catch { /* fallback */ }
 
-  // Sessions and cron are placeholders for now
-  const sessionsToday = 12;
-  const cronJobs = 3;
+  // Real sessions today from state.db
+  let sessionsToday = 0;
+  try {
+    const output = execSync(
+      `sqlite3 -json /opt/data/state.db "SELECT COUNT(*) AS count FROM sessions WHERE datetime(started_at, 'unixepoch') >= date('now')"`,
+      { timeout: 10, encoding: "utf-8" }
+    );
+    const rows = JSON.parse(output);
+    sessionsToday = rows[0]?.count || 0;
+  } catch { /* fallback */ }
+
+  // Real cron job count from jobs.json
+  let cronJobs = 0;
+  try {
+    const data = JSON.parse(readFileSync("/opt/data/cron/jobs.json", "utf-8"));
+    cronJobs = (data.jobs || []).filter((j: any) => j.enabled).length;
+  } catch { /* fallback */ }
 
   return {
     cpu: { usage: Math.round(cpuUsage * 10) / 10, cores },
