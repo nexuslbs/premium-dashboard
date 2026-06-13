@@ -17,18 +17,28 @@ export function renderContainers(container: HTMLElement): void {
   loadContainers();
 }
 
+function replaceSpinnersWithDash(): void {
+  document.querySelectorAll(".container-memory").forEach((el) => {
+    if (el.querySelector(".loading-spinner")) {
+      el.textContent = "\u2014";
+    }
+  });
+}
+
 async function loadContainers(): Promise<void> {
   const grid = document.getElementById("container-grid")!;
   try {
+    // Fast load — containers without memory
     const containers = await apiGet<ContainerInfo[]>("/containers");
     if (containers.length === 0) {
       grid.innerHTML = `<div class="empty-state">No containers found</div>`;
       return;
     }
+    // Render with spinner placeholders for memory
     grid.innerHTML = containers
       .map(
         (c) => `
-      <div class="container-card">
+      <div class="container-card" data-container-name="${escapeHtml(c.name)}">
         <div class="container-card-header">
           <span class="container-name">${escapeHtml(c.name)}</span>
           <span class="container-status">
@@ -39,7 +49,7 @@ async function loadContainers(): Promise<void> {
         <div class="container-info">
           <div class="container-info-row">
             <span>Image</span>
-            <span style="color:var(--text-secondary);font-family:monospace;font-size:0.7rem;">${escapeHtml(c.image)}</span>
+            <span style="color:var(--text-secondary);font-family:monospace;font-size:0.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;display:inline-block;vertical-align:middle;">${escapeHtml(c.image)}</span>
           </div>
           <div class="container-info-row">
             <span>Uptime</span>
@@ -47,7 +57,7 @@ async function loadContainers(): Promise<void> {
           </div>
           <div class="container-info-row">
             <span>Memory</span>
-            <span>${c.memory}</span>
+            <span class="container-memory" data-container-name="${escapeHtml(c.name)}"><span class="loading-spinner"></span></span>
           </div>
           ${c.ports ? `<div class="container-info-row"><span>Ports</span><span style="font-family:monospace;font-size:0.7rem;">${escapeHtml(c.ports)}</span></div>` : ""}
         </div>
@@ -55,13 +65,36 @@ async function loadContainers(): Promise<void> {
     `
       )
       .join("");
+
+    // Background — lazy-load memory values
+    loadMemoryAsync();
   } catch (e) {
     grid.innerHTML = `<div class="error-state">Failed to load containers: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
+}
+
+async function loadMemoryAsync(): Promise<void> {
+  try {
+    const memMap = await apiGet<Record<string, string>>("/containers/memory");
+    for (const [name, memory] of Object.entries(memMap)) {
+      const el = document.querySelector(`.container-memory[data-container-name="${escapeCss(name)}"]`);
+      if (el) {
+        el.textContent = memory;
+      }
+    }
+  } catch (e) {
+    console.error("Container memory async load error:", e);
+  }
+  // Clean up spinners that weren't updated (timeout returned {} or container not running)
+  replaceSpinnersWithDash();
 }
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+function escapeCss(text: string): string {
+  return text.replace(/"/g, '\\"').replace(/'/g, "\\'");
 }

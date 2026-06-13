@@ -12,6 +12,9 @@ cronRouter.get("/", (_req, res) => {
       schedule: job.schedule_display || job.schedule?.display || "",
       last_run_at: job.last_run_at || null,
       next_run_at: job.next_run_at || null,
+      // Aliases for frontend compatibility (frontend reads last_run / next_run)
+      last_run: job.last_run_at || null,
+      next_run: job.next_run_at || null,
       status: job.enabled ? "active" : "paused",
       last_status: job.last_status || null,
       skills: job.skills || [],

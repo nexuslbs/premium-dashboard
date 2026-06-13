@@ -23,7 +23,7 @@ RUN npm run build:server
 FROM nginx:alpine
 
 # Install Node.js for API server
-RUN apk add --no-cache nodejs docker-cli
+RUN apk add --no-cache nodejs docker-cli sqlite
 
 # Copy frontend build to nginx
 COPY --from=builder /build/dist /usr/share/nginx/html

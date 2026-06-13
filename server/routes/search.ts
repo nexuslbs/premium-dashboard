@@ -73,6 +73,7 @@ searchRouter.post("/", async (req, res) => {
 
     res.json(results);
   } catch (e: any) {
+    console.error("Search endpoint error:", e?.message || e);
     res.status(500).json({ error: e.message || "Unknown error" });
   }
 });

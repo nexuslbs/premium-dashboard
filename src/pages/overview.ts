@@ -28,7 +28,6 @@ export function renderOverview(container: HTMLElement): void {
   `;
 
   loadStats();
-  loadQuickInfo();
 }
 
 async function loadStats(): Promise<void> {
@@ -73,17 +72,18 @@ async function loadStats(): Promise<void> {
         <svg width="36" height="36" class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </div>
     `;
+    // Render quick info from same stats data
+    renderQuickInfo(stats);
     requestAnimationFrame(() => drawChart(stats));
   } catch (e) {
     grid.innerHTML = `<div class="error-state">Failed to load stats: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
 }
 
-async function loadQuickInfo(): Promise<void> {
-  const el = document.getElementById("quick-info")!;
-  try {
-    const stats = await apiGet<SystemStats>("/stats");
-    el.innerHTML = `
+function renderQuickInfo(stats: SystemStats): void {
+  const el = document.getElementById("quick-info");
+  if (!el) return;
+  el.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.875rem;">
         <div style="display:flex;justify-content:space-between;color:var(--text-secondary);">
           <span>System Uptime</span>
@@ -111,9 +111,19 @@ async function loadQuickInfo(): Promise<void> {
         </div>
       </div>
     `;
-  } catch {
-    el.innerHTML = `<div class="error-state">Failed to load</div>`;
-  }
+}
+
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: [number, number, number, number]): void {
+  ctx.moveTo(x + r[0], y);
+  ctx.lineTo(x + w - r[1], y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+  ctx.lineTo(x + w, y + h - r[2]);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+  ctx.lineTo(x + r[3], y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+  ctx.lineTo(x, y + r[0]);
+  ctx.quadraticCurveTo(x, y, x + r[0], y);
+  ctx.closePath();
 }
 
 function drawChart(stats: SystemStats): void {
@@ -171,7 +181,7 @@ function drawChart(stats: SystemStats): void {
   cpuGrad.addColorStop(1, "rgba(139,92,246,0.3)");
   ctx.fillStyle = cpuGrad;
   ctx.beginPath();
-  ctx.roundRect(cpuX, cpuY, barWidth, cpuH, [4, 4, 0, 0]);
+  roundRectPath(ctx, cpuX, cpuY, barWidth, cpuH, [4, 4, 0, 0]);
   ctx.fill();
 
   // CPU label
@@ -195,7 +205,7 @@ function drawChart(stats: SystemStats): void {
   memGrad.addColorStop(1, "rgba(6,182,212,0.3)");
   ctx.fillStyle = memGrad;
   ctx.beginPath();
-  ctx.roundRect(memX, memY, barWidth, memH, [4, 4, 0, 0]);
+  roundRectPath(ctx, memX, memY, barWidth, memH, [4, 4, 0, 0]);
   ctx.fill();
 
   // Memory label
