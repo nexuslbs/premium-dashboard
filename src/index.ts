@@ -26,7 +26,20 @@ document.querySelectorAll(".nav-item").forEach((item) => {
     e.preventDefault();
     const route = (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
     const url = (item as HTMLAnchorElement).getAttribute("href") || "/";
-    document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
+    document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => n.classList.remove("active"));
+    item.classList.add("active");
+    history.pushState({}, "", url);
+    router.go(route);
+  });
+});
+
+// Mobile nav click handlers
+document.querySelectorAll(".mobile-nav-item").forEach((item) => {
+  item.addEventListener("click", (e) => {
+    e.preventDefault();
+    const route = (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
+    const url = (item as HTMLAnchorElement).getAttribute("href") || "/";
+    document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => n.classList.remove("active"));
     item.classList.add("active");
     history.pushState({}, "", url);
     router.go(route);
@@ -36,7 +49,7 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 // Handle browser back/forward
 window.addEventListener("popstate", () => {
   const path = location.pathname.slice(1) || "overview";
-  document.querySelectorAll(".nav-item").forEach((n) => {
+  document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => {
     n.classList.toggle("active", n.getAttribute("data-route") === path);
   });
   router.go(path);
@@ -44,7 +57,7 @@ window.addEventListener("popstate", () => {
 
 // Initial render
 const initialRoute = location.pathname.slice(1) || "overview";
-document.querySelectorAll(".nav-item").forEach((n) => {
+document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => {
   n.classList.toggle("active", n.getAttribute("data-route") === initialRoute);
 });
 router.go(initialRoute);

@@ -73,6 +73,7 @@ async function loadStats(): Promise<void> {
         <svg class="stat-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </div>
     `;
+    drawChart(stats);
   } catch (e) {
     grid.innerHTML = `<div class="error-state">Failed to load stats: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
@@ -113,6 +114,96 @@ async function loadQuickInfo(): Promise<void> {
   } catch {
     el.innerHTML = `<div class="error-state">Failed to load</div>`;
   }
+}
+
+function drawChart(stats: SystemStats): void {
+  const canvas = document.getElementById("resource-chart") as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = rect.height;
+  const cpuPercent = Math.min(stats.cpu.usage, 100);
+  const memPercent = Math.min(stats.memory.percent, 100);
+  const barWidth = w * 0.3;
+  const gap = w * 0.08;
+  const totalWidth = barWidth * 2 + gap;
+  const startX = (w - totalWidth) / 2;
+  const bottomMargin = 40;
+  const topMargin = 30;
+  const drawH = h - bottomMargin - topMargin;
+
+  // Background grid line
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  for (let pct = 0; pct <= 100; pct += 25) {
+    const y = topMargin + drawH - (pct / 100) * drawH;
+    ctx.beginPath();
+    ctx.moveTo(10, y);
+    ctx.lineTo(w - 10, y);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(148,163,184,0.5)";
+    ctx.font = "10px Inter, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(pct + "%", 8, y + 3);
+  }
+  ctx.setLineDash([]);
+
+  // CPU bar
+  const cpuX = startX;
+  const cpuH = (cpuPercent / 100) * drawH;
+  const cpuY = topMargin + drawH - cpuH;
+
+  const cpuGrad = ctx.createLinearGradient(cpuX, cpuY, cpuX, topMargin + drawH);
+  cpuGrad.addColorStop(0, "rgba(139,92,246,0.9)");
+  cpuGrad.addColorStop(1, "rgba(139,92,246,0.3)");
+  ctx.fillStyle = cpuGrad;
+  ctx.beginPath();
+  ctx.roundRect(cpuX, cpuY, barWidth, cpuH, [4, 4, 0, 0]);
+  ctx.fill();
+
+  // CPU label
+  ctx.fillStyle = "rgba(148,163,184,0.8)";
+  ctx.font = "11px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("CPU", cpuX + barWidth / 2, h - 10);
+
+  // CPU value
+  ctx.fillStyle = "#a78bfa";
+  ctx.font = "bold 13px Inter, sans-serif";
+  ctx.fillText(cpuPercent.toFixed(1) + "%", cpuX + barWidth / 2, cpuY - 6);
+
+  // Memory bar
+  const memX = startX + barWidth + gap;
+  const memH = (memPercent / 100) * drawH;
+  const memY = topMargin + drawH - memH;
+
+  const memGrad = ctx.createLinearGradient(memX, memY, memX, topMargin + drawH);
+  memGrad.addColorStop(0, "rgba(6,182,212,0.9)");
+  memGrad.addColorStop(1, "rgba(6,182,212,0.3)");
+  ctx.fillStyle = memGrad;
+  ctx.beginPath();
+  ctx.roundRect(memX, memY, barWidth, memH, [4, 4, 0, 0]);
+  ctx.fill();
+
+  // Memory label
+  ctx.fillStyle = "rgba(148,163,184,0.8)";
+  ctx.font = "11px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Memory", memX + barWidth / 2, h - 10);
+
+  // Memory value
+  ctx.fillStyle = "#22d3ee";
+  ctx.font = "bold 13px Inter, sans-serif";
+  ctx.fillText(memPercent.toFixed(0) + "%", memX + barWidth / 2, memY - 6);
 }
 
 function formatUptime(seconds: number): string {
