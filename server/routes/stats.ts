@@ -4,9 +4,57 @@ import { readFileSync, statfsSync } from "fs";
 import { request as httpRequest } from "http";
 import { queryDb } from "../db.js";
 
-// Previous CPU counters for delta calculation
-let prevCpuTotal = 0;
-let prevCpuIdle = 0;
+// ── CPU measurement: fixed-rate sampling ──
+// Decoupled from HTTP request timing so rapid refreshes return stable values
+// and the sampling window is consistent (5s) regardless of when the user clicks.
+
+function readCpuCounters(): { total: number; idle: number } {
+  try {
+    const cpuInfo = readFileSync("/proc/stat", "utf-8");
+    const cpuLine = cpuInfo.split("\n").find((l: string) => l.startsWith("cpu "));
+    const parts = cpuLine?.split(/\s+/).slice(1).map(Number) || [0, 0, 0, 0];
+    return { total: parts.reduce((a: number, b: number) => a + b, 0), idle: parts[3] };
+  } catch {
+    return { total: 0, idle: 0 };
+  }
+}
+
+let prevCpuTotal: number;
+let prevCpuIdle: number;
+let latestCpu = 0;
+let cpuInitialized = false;
+
+// Initial baseline
+function initCpuBaseline(): void {
+  const c = readCpuCounters();
+  prevCpuTotal = c.total;
+  prevCpuIdle = c.idle;
+}
+
+// Called on a fixed 5s interval
+function sampleCpu(): void {
+  const { total, idle } = readCpuCounters();
+  const deltaTotal = total - prevCpuTotal;
+  const deltaIdle = idle - prevCpuIdle;
+  prevCpuTotal = total;
+  prevCpuIdle = idle;
+
+  if (deltaTotal <= 0) return;
+  const raw = ((deltaTotal - deltaIdle) / deltaTotal) * 100;
+
+  if (!cpuInitialized) {
+    latestCpu = raw;
+    cpuInitialized = true;
+  } else {
+    // Exponential smoothing over 5s ticks
+    latestCpu = 0.3 * raw + 0.7 * latestCpu;
+  }
+}
+
+// Warm up immediately at module load, then tick every 5s
+initCpuBaseline();
+sampleCpu(); // first sample gives a real value immediately
+setInterval(sampleCpu, 5000);
 
 export const statsRouter = Router();
 
@@ -24,7 +72,7 @@ function dockerApi<T>(path: string): Promise<T> {
         path,
         method: "GET",
         timeout: 8000,
-        headers: { "Host": "localhost" },
+        headers: { Host: "localhost" },
       },
       (res) => {
         let data = "";
@@ -33,10 +81,14 @@ function dockerApi<T>(path: string): Promise<T> {
           try {
             resolve(JSON.parse(data));
           } catch {
-            reject(new Error(`Failed to parse Docker API response: ${data.slice(0, 200)}`));
+            reject(
+              new Error(
+                `Failed to parse Docker API response: ${data.slice(0, 200)}`,
+              ),
+            );
           }
         });
-      }
+      },
     );
     req.on("error", reject);
     req.on("timeout", () => {
@@ -48,33 +100,25 @@ function dockerApi<T>(path: string): Promise<T> {
 }
 
 async function getStats() {
-  // CPU — momentary usage via delta between samples
-  const cpuInfo = readFileSync("/proc/stat", "utf-8");
-  const cpuLine = cpuInfo.split("\n").find((l) => l.startsWith("cpu "));
-  const parts = cpuLine?.split(/\s+/).slice(1).map(Number) || [0, 0, 0, 0];
-  const total = parts.reduce((a, b) => a + b, 0);
-  const idle = parts[3];
-
-  let cpuUsage = 0;
-  if (prevCpuTotal > 0 && total > prevCpuTotal) {
-    const deltaTotal = total - prevCpuTotal;
-    const deltaIdle = idle - prevCpuIdle;
-    cpuUsage = deltaTotal > 0 ? ((deltaTotal - deltaIdle) / deltaTotal) * 100 : 0;
-  }
-  prevCpuTotal = total;
-  prevCpuIdle = idle;
-
-  const cores = readFileSync("/proc/cpuinfo", "utf-8").split("\n").filter((l) => l.startsWith("processor")).length || 1;
+  // CPU — pre-sampled every 5s by the timer above
+  const cores =
+    readFileSync("/proc/cpuinfo", "utf-8")
+      .split("\n")
+      .filter((l) => l.startsWith("processor")).length || 1;
 
   // Memory
   const memInfo = readFileSync("/proc/meminfo", "utf-8");
-  const memTotal = parseInt(memInfo.match(/MemTotal:\s+(\d+)/)?.[1] || "0", 10) * 1024;
-  const memAvailable = parseInt(memInfo.match(/MemAvailable:\s+(\d+)/)?.[1] || "0", 10) * 1024;
+  const memTotal =
+    parseInt(memInfo.match(/MemTotal:\s+(\d+)/)?.[1] || "0", 10) * 1024;
+  const memAvailable =
+    parseInt(memInfo.match(/MemAvailable:\s+(\d+)/)?.[1] || "0", 10) * 1024;
   const memUsed = memTotal - memAvailable;
   const memPercent = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
 
   // Disk — use statfsSync (no child process), fallback to df
-  let diskTotal = 0, diskUsed = 0, diskPercent = 0;
+  let diskTotal = 0,
+    diskUsed = 0,
+    diskPercent = 0;
   try {
     const stat = statfsSync("/");
     const blocks = Number(stat.blocks);
@@ -91,7 +135,12 @@ async function getStats() {
     console.error("Disk stats statfsSync failed:", e?.message || e);
     // Fallback: use df -P
     try {
-      const df = execSync("df -P / | tail -1", { timeout: 5, encoding: "utf-8" }).toString().trim();
+      const df = execSync("df -P / | tail -1", {
+        timeout: 5,
+        encoding: "utf-8",
+      })
+        .toString()
+        .trim();
       const dfParts = df.split(/\s+/);
       diskTotal = parseInt(dfParts[1] || "0", 10) * 1024;
       diskUsed = parseInt(dfParts[2] || "0", 10) * 1024;
@@ -104,7 +153,10 @@ async function getStats() {
   }
 
   // Guard: ensure disk values are valid numbers
-  if (!isFinite(diskTotal) || diskTotal <= 0) { diskTotal = 0; diskPercent = 0; }
+  if (!isFinite(diskTotal) || diskTotal <= 0) {
+    diskTotal = 0;
+    diskPercent = 0;
+  }
   if (!isFinite(diskUsed)) diskUsed = 0;
 
   // System uptime
@@ -114,7 +166,9 @@ async function getStats() {
   // Docker containers
   let containersRunning = 0;
   try {
-    const containers = await dockerApi<DockerContainer[]>("/containers/json?limit=999");
+    const containers = await dockerApi<DockerContainer[]>(
+      "/containers/json?limit=999",
+    );
     containersRunning = containers.filter((c) => c.State === "running").length;
   } catch (e: any) {
     console.error("Docker containers count error:", e?.message || e);
@@ -123,7 +177,9 @@ async function getStats() {
   // Sessions today
   let sessionsToday = 0;
   try {
-    const rows = queryDb("SELECT COUNT(*) AS count FROM sessions WHERE datetime(started_at, 'unixepoch') >= date('now')");
+    const rows = queryDb(
+      "SELECT COUNT(*) AS count FROM sessions WHERE datetime(started_at, 'unixepoch') >= date('now')",
+    );
     sessionsToday = (rows?.[0] as any)?.count || 0;
   } catch (e: any) {
     console.error("Sessions today count error:", e?.message || e);
@@ -139,9 +195,17 @@ async function getStats() {
   }
 
   return {
-    cpu: { usage: Math.round(cpuUsage * 10) / 10, cores },
-    memory: { total: memTotal, used: memUsed, percent: Math.round(memPercent * 10) / 10 },
-    disk: { total: diskTotal, used: diskUsed, percent: Math.round(diskPercent * 10) / 10 },
+    cpu: { usage: Math.round(latestCpu * 10) / 10, cores },
+    memory: {
+      total: memTotal,
+      used: memUsed,
+      percent: Math.round(memPercent * 10) / 10,
+    },
+    disk: {
+      total: diskTotal,
+      used: diskUsed,
+      percent: Math.round(diskPercent * 10) / 10,
+    },
     uptime,
     sessions_today: sessionsToday,
     containers_running: containersRunning,
@@ -155,6 +219,8 @@ statsRouter.get("/", async (_req, res) => {
     res.json(stats);
   } catch (e: any) {
     console.error("Stats endpoint error:", e?.message || e);
-    res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
+    res
+      .status(500)
+      .json({ error: e instanceof Error ? e.message : "Unknown error" });
   }
 });

@@ -62,7 +62,7 @@ async function loadContainers(): Promise<void> {
           ${c.ports ? `<div class="container-info-row"><span>Ports</span><span style="font-family:monospace;font-size:0.7rem;">${escapeHtml(c.ports)}</span></div>` : ""}
         </div>
       </div>
-    `
+    `,
       )
       .join("");
 
@@ -77,7 +77,9 @@ async function loadMemoryAsync(): Promise<void> {
   try {
     const memMap = await apiGet<Record<string, string>>("/containers/memory");
     for (const [name, memory] of Object.entries(memMap)) {
-      const el = document.querySelector(`.container-memory[data-container-name="${escapeCss(name)}"]`);
+      const el = document.querySelector(
+        `.container-memory[data-container-name="${escapeCss(name)}"]`,
+      );
       if (el) {
         el.textContent = memory;
       }

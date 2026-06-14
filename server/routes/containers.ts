@@ -31,7 +31,7 @@ function dockerApi<T>(path: string, method = "GET"): Promise<T> {
         path,
         method,
         timeout: 5000,
-        headers: { "Host": "localhost" },
+        headers: { Host: "localhost" },
       },
       (res) => {
         let data = "";
@@ -40,10 +40,14 @@ function dockerApi<T>(path: string, method = "GET"): Promise<T> {
           try {
             resolve(JSON.parse(data));
           } catch {
-            reject(new Error(`Failed to parse Docker API response: ${data.slice(0, 200)}`));
+            reject(
+              new Error(
+                `Failed to parse Docker API response: ${data.slice(0, 200)}`,
+              ),
+            );
           }
         });
-      }
+      },
     );
     req.on("error", reject);
     req.on("timeout", () => {
@@ -57,7 +61,8 @@ function dockerApi<T>(path: string, method = "GET"): Promise<T> {
 function formatMemory(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB`;
 }
 
@@ -70,14 +75,27 @@ function parseContainer(c: DockerContainer, memory: string) {
     .join(", ");
   const uptimeMatch = status.match(/(\d+\s+\w+\s+\d+[\d:]*)/);
   const uptime = uptimeMatch ? uptimeMatch[1] : status.slice(0, 30);
-  return { name, image: c.Image, status: c.Status, state, uptime, memory, ports, id: c.Id };
+  return {
+    name,
+    image: c.Image,
+    status: c.Status,
+    state,
+    uptime,
+    memory,
+    ports,
+    id: c.Id,
+  };
 }
 
 // Main endpoint — returns all containers with no memory (fast)
 containersRouter.get("/", async (_req, res) => {
   try {
-    const containers = await dockerApi<DockerContainer[]>("/containers/json?all=true");
-    const result = containers.map((c) => parseContainer(c, "—"));
+    const containers = await dockerApi<DockerContainer[]>(
+      "/containers/json?all=true",
+    );
+    const result = containers
+      .map((c) => parseContainer(c, "—"))
+      .sort((a, b) => a.name.localeCompare(b.name));
     res.json(result);
   } catch (e: any) {
     console.error("Containers list error:", e?.message || e);
@@ -94,7 +112,9 @@ const MEM_CACHE_TTL = 15_000; // 15 seconds
 // Results are cached for MEM_CACHE_TTL ms so the frontend can poll freely.
 containersRouter.get("/memory", async (_req, res) => {
   try {
-    const containers = await dockerApi<DockerContainer[]>("/containers/json?all=true");
+    const containers = await dockerApi<DockerContainer[]>(
+      "/containers/json?all=true",
+    );
     const runningContainers = containers.filter((c) => c.State === "running");
     const now = Date.now();
 
@@ -120,17 +140,22 @@ containersRouter.get("/memory", async (_req, res) => {
           try {
             const stats = await Promise.race<DockerStats>([
               dockerApi<DockerStats>(`/containers/${c.Id}/stats?stream=false`),
-              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("timeout")), 5000),
+              ),
             ]);
             const memStats = stats.memory_stats;
             if (!memStats || !memStats.usage) return { name, memory: "—" };
             const cache = memStats.stats?.cache || 0;
             const used = memStats.usage - cache;
-            return { name, memory: `${formatMemory(used)} / ${formatMemory(memStats.limit)}` };
+            return {
+              name,
+              memory: `${formatMemory(used)} / ${formatMemory(memStats.limit)}`,
+            };
           } catch {
             return { name, memory: "—" };
           }
-        })
+        }),
       );
 
       for (const result of memResults) {

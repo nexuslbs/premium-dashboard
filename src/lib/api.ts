@@ -54,6 +54,10 @@ export interface CronJob {
   last_run: string;
   next_run: string;
   status: string;
+  last_status: string | null;
+  skills: string[];
+  script: string | null;
+  no_agent: boolean;
 }
 
 export interface SearchResult {
@@ -62,6 +66,25 @@ export interface SearchResult {
   score: number;
   content_preview: string;
   url: string;
+}
+
+export interface FsEntry {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  size: number | null;
+}
+
+export interface FsListResponse {
+  entries: FsEntry[];
+  path: string;
+  error?: string;
+}
+
+export interface FsReadResponse {
+  path: string;
+  content: string;
+  size: number;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

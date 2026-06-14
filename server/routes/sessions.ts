@@ -6,7 +6,7 @@ export const sessionsRouter = Router();
 sessionsRouter.get("/", (_req, res) => {
   try {
     const rows = queryDb(
-      `SELECT id, COALESCE(title, 'Untitled') AS title, model, source AS provider, started_at, message_count AS turn_count, ended_at FROM sessions ORDER BY started_at DESC LIMIT 50`
+      `SELECT id, COALESCE(title, 'Untitled') AS title, model, source AS provider, started_at, message_count AS turn_count, ended_at FROM sessions ORDER BY started_at DESC LIMIT 50`,
     );
     const mapped = (rows || []).map((row: any) => ({
       id: row.id,
@@ -38,7 +38,7 @@ sessionsRouter.get("/:id/messages", (req, res) => {
       return;
     }
     const rows = queryDb(
-      `SELECT id, session_id, role, content, tool_name, timestamp, token_count, reasoning FROM messages WHERE session_id = '${safeId.replace(/'/g, "''")}' ORDER BY timestamp ASC`
+      `SELECT id, session_id, role, content, tool_name, timestamp, token_count, reasoning FROM messages WHERE session_id = '${safeId.replace(/'/g, "''")}' ORDER BY timestamp ASC`,
     );
     res.json(rows || []);
   } catch (e: any) {

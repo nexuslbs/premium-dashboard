@@ -113,7 +113,14 @@ function renderQuickInfo(stats: SystemStats): void {
     `;
 }
 
-function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: [number, number, number, number]): void {
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: [number, number, number, number],
+): void {
   ctx.moveTo(x + r[0], y);
   ctx.lineTo(x + w - r[1], y);
   ctx.quadraticCurveTo(x + w, y, x + w, y + r[1]);
@@ -127,7 +134,9 @@ function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
 }
 
 function drawChart(stats: SystemStats): void {
-  const canvas = document.getElementById("resource-chart") as HTMLCanvasElement | null;
+  const canvas = document.getElementById(
+    "resource-chart",
+  ) as HTMLCanvasElement | null;
   if (!canvas) return;
   // Ensure canvas has explicit width for proper rendering
   if (canvas.width === 0) {

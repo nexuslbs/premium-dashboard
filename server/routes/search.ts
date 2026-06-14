@@ -17,22 +17,27 @@ searchRouter.post("/", async (req, res) => {
   }
 
   try {
-    const scrollResponse = await fetch("http://hermes-qdrant:6333/collections/hermes-wiki/points/scroll", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        limit: 100,
-        with_payload: true,
-        with_vector: false,
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
+    const scrollResponse = await fetch(
+      "http://hermes-qdrant:6333/collections/hermes-wiki/points/scroll",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          limit: 100,
+          with_payload: true,
+          with_vector: false,
+        }),
+        signal: AbortSignal.timeout(5000),
+      },
+    );
 
     if (!scrollResponse.ok) {
       throw new Error(`Qdrant scroll returned ${scrollResponse.status}`);
     }
 
-    const scrollData = await scrollResponse.json() as { result?: { points?: any[] } };
+    const scrollData = (await scrollResponse.json()) as {
+      result?: { points?: any[] };
+    };
     const points = scrollData.result?.points || [];
 
     // Filter by case-insensitive substring match
@@ -42,7 +47,11 @@ searchRouter.post("/", async (req, res) => {
       const contentPreview = (payload.content_preview || "").toLowerCase();
       const filePath = (payload.file_path || "").toLowerCase();
       const sectionTitle = (payload.section_title || "").toLowerCase();
-      return contentPreview.includes(q) || filePath.includes(q) || sectionTitle.includes(q);
+      return (
+        contentPreview.includes(q) ||
+        filePath.includes(q) ||
+        sectionTitle.includes(q)
+      );
     });
 
     // Sort by relevance
@@ -51,9 +60,13 @@ searchRouter.post("/", async (req, res) => {
       const bp = b.payload || {};
       const aFilePath = (ap.file_path || "").toLowerCase().includes(q) ? 1 : 0;
       const bFilePath = (bp.file_path || "").toLowerCase().includes(q) ? 1 : 0;
-      const aSection = (ap.section_title || "").toLowerCase().includes(q) ? 1 : 0;
-      const bSection = (bp.section_title || "").toLowerCase().includes(q) ? 1 : 0;
-      return (bFilePath + bSection) - (aFilePath + aSection);
+      const aSection = (ap.section_title || "").toLowerCase().includes(q)
+        ? 1
+        : 0;
+      const bSection = (bp.section_title || "").toLowerCase().includes(q)
+        ? 1
+        : 0;
+      return bFilePath + bSection - (aFilePath + aSection);
     });
 
     const results = matched.slice(0, limit).map((p: any) => {

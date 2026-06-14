@@ -1,7 +1,7 @@
 import { renderOverview } from "../pages/overview";
 import { renderSessions, renderSessionDetail } from "../pages/sessions";
 import { renderContainers } from "../pages/containers";
-import { renderCron } from "../pages/cron";
+import { renderCron, renderCronDetail } from "../pages/cron";
 import { renderSearch } from "../pages/search";
 
 type PageRenderer = (container: HTMLElement) => void;
@@ -27,6 +27,7 @@ const routes: Route[] = [
 
 const paramRoutes: ParamRoute[] = [
   { prefix: "session/", handler: renderSessionDetail },
+  { prefix: "cron/", handler: renderCronDetail },
 ];
 
 function createRouter() {

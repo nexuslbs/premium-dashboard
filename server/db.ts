@@ -32,9 +32,13 @@ export function queryDb(sql: string, timeoutSec: number = 15): any[] {
       return text ? JSON.parse(text) : [];
     } catch (e: any) {
       const isLast = attempt === maxAttempts;
-      console.error(`queryDb attempt ${attempt}/${maxAttempts}: ${e?.message || e}`);
+      console.error(
+        `queryDb attempt ${attempt}/${maxAttempts}: ${e?.message || e}`,
+      );
       if (isLast) {
-        console.error(`queryDb: all ${maxAttempts} attempts failed for SQL: ${sql.slice(0, 120)}`);
+        console.error(
+          `queryDb: all ${maxAttempts} attempts failed for SQL: ${sql.slice(0, 120)}`,
+        );
         return [];
       }
       execSync(`sleep ${attempt}`, { timeout: 5 });

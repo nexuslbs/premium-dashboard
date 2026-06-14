@@ -23,6 +23,8 @@ cronRouter.get("/", (_req, res) => {
     }));
     res.json(jobs);
   } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : "Unknown error" });
+    res
+      .status(500)
+      .json({ error: e instanceof Error ? e.message : "Unknown error" });
   }
 });

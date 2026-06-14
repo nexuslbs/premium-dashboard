@@ -24,9 +24,12 @@ async function checkConnection(): Promise<void> {
 document.querySelectorAll(".nav-item").forEach((item) => {
   item.addEventListener("click", (e) => {
     e.preventDefault();
-    const route = (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
+    const route =
+      (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
     const url = (item as HTMLAnchorElement).getAttribute("href") || "/";
-    document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => n.classList.remove("active"));
+    document
+      .querySelectorAll(".nav-item, .mobile-nav-item")
+      .forEach((n) => n.classList.remove("active"));
     item.classList.add("active");
     history.pushState({}, "", url);
     router.go(route);
@@ -37,9 +40,12 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 document.querySelectorAll(".mobile-nav-item").forEach((item) => {
   item.addEventListener("click", (e) => {
     e.preventDefault();
-    const route = (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
+    const route =
+      (item as HTMLAnchorElement).getAttribute("data-route") || "overview";
     const url = (item as HTMLAnchorElement).getAttribute("href") || "/";
-    document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => n.classList.remove("active"));
+    document
+      .querySelectorAll(".nav-item, .mobile-nav-item")
+      .forEach((n) => n.classList.remove("active"));
     item.classList.add("active");
     history.pushState({}, "", url);
     router.go(route);
@@ -62,7 +68,8 @@ window.addEventListener("popstate", () => {
 const initialRoute = location.pathname.slice(1) || "overview";
 document.querySelectorAll(".nav-item, .mobile-nav-item").forEach((n) => {
   const navRoute = n.getAttribute("data-route") || "";
-  const isActive = initialRoute === navRoute || initialRoute.startsWith(navRoute + "/");
+  const isActive =
+    initialRoute === navRoute || initialRoute.startsWith(navRoute + "/");
   n.classList.toggle("active", isActive);
 });
 router.go(initialRoute);

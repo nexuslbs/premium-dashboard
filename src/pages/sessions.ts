@@ -43,7 +43,9 @@ async function loadSessions(): Promise<void> {
             </tr>
           </thead>
           <tbody>
-            ${sessions.map(s => `
+            ${sessions
+              .map(
+                (s) => `
               <tr class="clickable-row" data-session-id="${s.id}">
                 <td style="font-family:monospace;font-size:0.75rem;">#${s.id}</td>
                 <td style="color:var(--text-primary);font-weight:500;">${escapeHtml(s.title || "Untitled")}</td>
@@ -53,7 +55,9 @@ async function loadSessions(): Promise<void> {
                 <td>${s.turn_count}</td>
                 <td><span class="badge ${s.status === "completed" ? "badge-success" : s.status === "active" ? "badge-warning" : "badge-neutral"}">${s.status}</span></td>
               </tr>
-            `).join("")}
+            `,
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -75,7 +79,10 @@ async function loadSessions(): Promise<void> {
 }
 
 // Session detail view
-export async function renderSessionDetail(container: HTMLElement, sessionId: string): Promise<void> {
+export async function renderSessionDetail(
+  container: HTMLElement,
+  sessionId: string,
+): Promise<void> {
   container.innerHTML = `
     <div class="page-header">
       <div>
@@ -110,7 +117,9 @@ export async function renderSessionDetail(container: HTMLElement, sessionId: str
 async function loadMessages(sessionId: string): Promise<void> {
   const el = document.getElementById("messages-container")!;
   try {
-    const messages = await apiGet<SessionMessage[]>(`/sessions/${encodeURIComponent(sessionId)}/messages`);
+    const messages = await apiGet<SessionMessage[]>(
+      `/sessions/${encodeURIComponent(sessionId)}/messages`,
+    );
     if (messages.length === 0) {
       el.innerHTML = `<div class="empty-state">No messages found for this session</div>`;
       return;
@@ -131,7 +140,9 @@ function renderMessage(msg: SessionMessage): string {
   const toolName = msg.tool_name;
   const reasoning = msg.reasoning;
   const tokenCount = msg.token_count;
-  const timestamp = msg.timestamp ? new Date(msg.timestamp * 1000).toLocaleString() : "";
+  const timestamp = msg.timestamp
+    ? new Date(msg.timestamp * 1000).toLocaleString()
+    : "";
 
   // Format content with code blocks
   const formattedContent = formatContent(content);
@@ -181,19 +192,24 @@ function formatContent(content: string): string {
 
   // Replace code blocks (```...```) with styled pre blocks
   escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
-    const langClass = lang ? ` class="code-lang" data-lang="${escapeHtml(lang)}"` : "";
+    const langClass = lang
+      ? ` class="code-lang" data-lang="${escapeHtml(lang)}"`
+      : "";
     return `<pre class="code-block"${langClass}><code>${code.trim()}</code></pre>`;
   });
 
   // Replace inline code
-  escaped = escaped.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  escaped = escaped.replace(
+    /`([^`]+)`/g,
+    '<code class="inline-code">$1</code>',
+  );
 
   // Replace double newlines with paragraph breaks
-  escaped = escaped.replace(/\n\n/g, '</p><p>');
-  escaped = escaped.replace(/\n/g, '<br>');
+  escaped = escaped.replace(/\n\n/g, "</p><p>");
+  escaped = escaped.replace(/\n/g, "<br>");
 
   // Wrap in paragraph if not already wrapped by code blocks
-  if (!escaped.startsWith('<pre')) {
+  if (!escaped.startsWith("<pre")) {
     escaped = `<p>${escaped}</p>`;
   }
 

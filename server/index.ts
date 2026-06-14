@@ -10,6 +10,7 @@ import { sessionsRouter } from "./routes/sessions.js";
 import { containersRouter } from "./routes/containers.js";
 import { cronRouter } from "./routes/cron.js";
 import { searchRouter } from "./routes/search.js";
+import { fsRouter } from "./routes/fs.js";
 import { healthRouter } from "./routes/health.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,7 @@ export function createApp() {
   app.use("/api/containers", containersRouter);
   app.use("/api/cron", cronRouter);
   app.use("/api/wiki-search", searchRouter);
+  app.use("/api/fs", fsRouter);
 
   // Serve static frontend
   const staticDir = join(__dirname, "..", "dist");
