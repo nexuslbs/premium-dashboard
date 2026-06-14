@@ -3,6 +3,7 @@ import { renderSessions, renderSessionDetail } from "../pages/sessions";
 import { renderContainers } from "../pages/containers";
 import { renderCron, renderCronDetail } from "../pages/cron";
 import { renderSearch } from "../pages/search";
+import { renderAgents, renderAgentDetail } from "../pages/agents";
 
 type PageRenderer = (container: HTMLElement) => void;
 type ParamPageRenderer = (container: HTMLElement, param: string) => void;
@@ -23,11 +24,13 @@ const routes: Route[] = [
   { name: "containers", handler: renderContainers },
   { name: "cron", handler: renderCron },
   { name: "search", handler: renderSearch },
+  { name: "agents", handler: renderAgents },
 ];
 
 const paramRoutes: ParamRoute[] = [
   { prefix: "session/", handler: renderSessionDetail },
   { prefix: "cron/", handler: renderCronDetail },
+  { prefix: "agent/", handler: renderAgentDetail },
 ];
 
 function createRouter() {

@@ -85,6 +85,87 @@ export interface FsReadResponse {
   path: string;
   content: string;
   size: number;
+  error?: string;
+}
+
+export interface AgentSessionSummary {
+  session_id: string;
+  first_event: string;
+  last_event: string;
+  event_count: number;
+  type_count: number;
+  prompt_count: number;
+  response_count: number;
+  tool_count: number;
+  reasoning_count: number;
+  delegate_count: number;
+  provider: string | null;
+  model: string | null;
+}
+
+export interface AgentEvent {
+  id: number;
+  timestamp: string;
+  session_id: string;
+  parent_session_id: string | null;
+  turn_index: number | null;
+  parent_id: number | null;
+  from_entity: string;
+  to_entity: string | null;
+  type: string;
+  subtype: string | null;
+  provider: string | null;
+  model: string | null;
+  usage: string | null;
+  content: string;
+  metadata: string | null;
+}
+
+export interface AgentSummary {
+  total_sessions: number;
+  total_events: number;
+  type_count: number;
+  oldest_event: string | null;
+  newest_event: string | null;
+}
+
+// ── New Agent Event List Interfaces ──
+
+export interface AgentEventItem {
+  id: number;
+  timestamp: string;
+  session_id: string;
+  agent_role: string;
+  type: string;
+  subtype: string | null;
+  from_entity: string;
+  to_entity: string;
+  provider: string | null;
+  model: string | null;
+  content: string;
+  metadata: string | null;
+}
+
+export interface AgentEventsResponse {
+  events: AgentEventItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface FilterOption {
+  role: string;
+  session_id: string;
+  count: number;
+}
+
+export interface AgentFilters {
+  sessions: { session_id: string; count: number }[];
+  types: string[];
+  subtypes: string[];
+  agents: FilterOption[];
+  providers: string[];
+  models: string[];
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 
 const DB_PATH = "/opt/data/state.db";
+const AGENT_DB_PATH = "/opt/data/agent-interactions.db";
 
 /**
  * Execute a SQL query against state.db using sqlite3 CLI with retry logic.
@@ -54,4 +55,46 @@ export function queryDb(sql: string, timeoutSec: number = 15): any[] {
 function shellQuote(s: string): string {
   const escaped = s.replace(/["$\\`]/g, "\\$&");
   return `"${escaped}"`;
+}
+
+/**
+ * Execute a SQL query against agent-interactions.db using sqlite3 CLI.
+ * Same pattern as queryDb() but targets the agent interactions database.
+ */
+export function queryAgentDb(sql: string, timeoutSec: number = 15): any[] {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const cmd = [
+        `sqlite3`,
+        `-cmd ".timeout 30000"`,
+        `-json`,
+        shellQuote(AGENT_DB_PATH),
+        shellQuote(sql),
+      ].join(" ");
+
+      const output = execSync(cmd, {
+        timeout: timeoutSec * 1000,
+        encoding: "utf-8",
+        maxBuffer: 16 * 1024 * 1024,
+        shell: "/bin/sh",
+      });
+
+      const text = (output || "").toString().trim();
+      return text ? JSON.parse(text) : [];
+    } catch (e: any) {
+      const isLast = attempt === maxAttempts;
+      console.error(
+        `queryAgentDb attempt ${attempt}/${maxAttempts}: ${e?.message || e}`,
+      );
+      if (isLast) {
+        console.error(
+          `queryAgentDb: all ${maxAttempts} attempts failed for SQL: ${sql.slice(0, 120)}`,
+        );
+        return [];
+      }
+      execSync(`sleep ${attempt}`, { timeout: 5 });
+    }
+  }
+  return [];
 }

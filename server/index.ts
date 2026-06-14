@@ -12,6 +12,7 @@ import { cronRouter } from "./routes/cron.js";
 import { searchRouter } from "./routes/search.js";
 import { fsRouter } from "./routes/fs.js";
 import { healthRouter } from "./routes/health.js";
+import { agentsRouter } from "./routes/agents.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,13 +28,14 @@ export function createApp() {
   app.use("/api/cron", cronRouter);
   app.use("/api/wiki-search", searchRouter);
   app.use("/api/fs", fsRouter);
+  app.use("/api/agents", agentsRouter);
 
   // Serve static frontend
   const staticDir = join(__dirname, "..", "dist");
   if (existsSync(staticDir)) {
     app.use(express.static(staticDir));
-    // SPA fallback
-    app.get("*", (_req, res) => {
+    // SPA fallback - use middleware approach
+    app.use((_req, res) => {
       res.sendFile(join(staticDir, "index.html"));
     });
   }

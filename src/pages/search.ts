@@ -122,6 +122,7 @@ interface TreeNode {
 
 let treeData: TreeNode[] | null = null;
 let expandedPaths = new Set<string>();
+let lastOpenedFile: string | null = null;
 
 // ── Main render ──
 
@@ -141,6 +142,9 @@ export function renderSearch(container: HTMLElement): void {
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           <input type="text" class="search-input" id="search-input" placeholder="Search the wiki..." />
+          <button class="search-clear-btn" id="search-clear" title="Clear search" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
         </div>
         <div class="content-view" id="content-view">
           <div class="empty-state" style="padding:3rem;text-align:center;color:var(--text-muted);">
@@ -163,12 +167,17 @@ export function renderSearch(container: HTMLElement): void {
 
   // Search input
   const input = document.getElementById("search-input") as HTMLInputElement;
+  const clearBtn = document.getElementById("search-clear") as HTMLButtonElement;
   let debounce: ReturnType<typeof setTimeout>;
-  input.addEventListener("input", () => {
-    clearTimeout(debounce);
-    const query = input.value.trim();
-    if (query.length < 2) {
-      // Clear search results, show tree again
+
+  function updateClearBtn(): void {
+    clearBtn.style.display = input.value.length > 0 ? "flex" : "none";
+  }
+
+  function restoreLastFile(): void {
+    if (lastOpenedFile) {
+      openFile(lastOpenedFile);
+    } else {
       const contentView = document.getElementById("content-view")!;
       contentView.innerHTML = `
         <div class="empty-state" style="padding:3rem;text-align:center;color:var(--text-muted);">
@@ -176,9 +185,26 @@ export function renderSearch(container: HTMLElement): void {
           <p style="font-size:0.875rem;">Browse the filesystem tree or search the wiki</p>
         </div>
       `;
+      contentView.scrollTop = 0;
+    }
+  }
+
+  input.addEventListener("input", () => {
+    clearTimeout(debounce);
+    updateClearBtn();
+    const query = input.value.trim();
+    if (query.length < 2) {
+      restoreLastFile();
       return;
     }
     debounce = setTimeout(() => doSearch(query), 300);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    updateClearBtn();
+    restoreLastFile();
+    input.focus();
   });
 
   // Load the file tree, then check for persisted file in URL
@@ -356,9 +382,58 @@ async function navigateToFile(fullPath: string): Promise<void> {
 
 // ── File viewer ──
 
+/** Highlight the matching tree item and scroll it into view */
+function highlightTreeItem(path: string): void {
+  // Remove previous selection from all tree items
+  document.querySelectorAll(".tree-item.selected").forEach((el) => {
+    el.classList.remove("selected");
+  });
+
+  // Find the tree item with matching data-path
+  const escapedPath = CSS.escape(path);
+  const treeItem = document.querySelector<HTMLElement>(
+    `.tree-item[data-path="${escapedPath}"]`,
+  );
+  if (!treeItem) return;
+
+  // Highlight it
+  treeItem.classList.add("selected");
+
+  // Scroll the explorer tree to make the item visible
+  const explorerTree = document.getElementById("explorer-tree");
+  if (explorerTree) {
+    const itemRect = treeItem.getBoundingClientRect();
+    const treeRect = explorerTree.getBoundingClientRect();
+    // Only scroll if the item is outside the visible area
+    if (
+      itemRect.top < treeRect.top ||
+      itemRect.bottom > treeRect.bottom
+    ) {
+      treeItem.scrollIntoView({ block: "nearest" });
+    }
+  }
+}
+
+/** Attach click handler on .file-path to scroll/highlight and copy */
+function attachFilePathClick(contentView: HTMLElement, path: string): void {
+  const filePathEl = contentView.querySelector<HTMLElement>(".file-path");
+  if (!filePathEl) return;
+  filePathEl.addEventListener("click", () => {
+    highlightTreeItem(path);
+    navigator.clipboard.writeText(path).catch(() => {});
+  });
+}
+
 async function openFile(path: string): Promise<void> {
+  // Track this as the most recently opened file
+  lastOpenedFile = path;
   const contentView = document.getElementById("content-view")!;
   contentView.innerHTML = '<div class="loading">Loading file</div>';
+  contentView.scrollTop = 0;
+
+  // Scroll the outer page (main-content) to the top
+  const mainContent = document.getElementById("main-content");
+  if (mainContent) mainContent.scrollTop = 0;
 
   // Update URL so the file path persists on reload
   const params = new URLSearchParams(location.search);
@@ -380,6 +455,7 @@ async function openFile(path: string): Promise<void> {
         </div>
         <div class="markdown-content">${rendered}</div>
       `;
+      contentView.scrollTop = 0;
       // Enhance code blocks with syntax highlighting and copy buttons
       const mdContainer = contentView.querySelector(".markdown-content");
       if (mdContainer) enhanceCodeBlocks(mdContainer as HTMLElement);
@@ -389,8 +465,9 @@ async function openFile(path: string): Promise<void> {
           <span class="file-path">${escapeHtml(path)}</span>
           <span class="file-size">${formatSize(response.size)}</span>
         </div>
-        <pre class="code-block" style="max-height:80vh;overflow-y:auto;border-radius:var(--radius-md);padding:1rem;font-size:0.8rem;line-height:1.6;"><code>${escapeHtml(response.content)}</code></pre>
+        <pre class="code-block" style="max-height:none;overflow-y:auto;border-radius:var(--radius-md);padding:1rem;font-size:0.8rem;line-height:1.6;"><code>${escapeHtml(response.content)}</code></pre>
       `;
+      contentView.scrollTop = 0;
     } else {
       contentView.innerHTML = `
         <div class="file-header">
@@ -402,9 +479,14 @@ async function openFile(path: string): Promise<void> {
           <p style="font-size:0.875rem;margin-top:0.5rem;">${formatSize(response.size)} — cannot preview</p>
         </div>
       `;
+      contentView.scrollTop = 0;
     }
+    // Highlight the file in the tree and attach click handler on file-path
+    highlightTreeItem(path);
+    attachFilePathClick(contentView, path);
   } catch (e) {
     contentView.innerHTML = `<div class="error-state">Failed to load: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
+    contentView.scrollTop = 0;
   }
 }
 
@@ -413,11 +495,13 @@ async function openFile(path: string): Promise<void> {
 async function doSearch(query: string): Promise<void> {
   const contentView = document.getElementById("content-view")!;
   contentView.innerHTML = '<div class="loading">Searching</div>';
+  contentView.scrollTop = 0;
 
   try {
     const results = await apiPost<SearchResult[]>("/wiki-search", { query, limit: 10 });
     if (results.length === 0) {
       contentView.innerHTML = '<div class="empty-state">No results found</div>';
+      contentView.scrollTop = 0;
       return;
     }
     contentView.innerHTML = `
@@ -438,6 +522,7 @@ async function doSearch(query: string): Promise<void> {
         `).join("")}
       </div>
     `;
+    contentView.scrollTop = 0;
 
     // Click search results to open file
     contentView.querySelectorAll(".search-result-item").forEach((el) => {
@@ -450,5 +535,6 @@ async function doSearch(query: string): Promise<void> {
     });
   } catch (e) {
     contentView.innerHTML = `<div class="error-state">Search failed: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
+    contentView.scrollTop = 0;
   }
 }
