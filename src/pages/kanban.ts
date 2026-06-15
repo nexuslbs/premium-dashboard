@@ -1,5 +1,6 @@
 import { apiGet, apiPost, type KanbanBoard, type KanbanTask, type KanbanTaskDetail } from "../lib/api";
 import { router } from "../lib/router";
+import { getAttachments, uploadAttachments, deleteAttachment, getDownloadUrl, formatFileSize, getFileIcon } from "../lib/attachments";
 
 export function renderKanban(container: HTMLElement): void {
   container.innerHTML = `
@@ -601,6 +602,24 @@ async function loadTaskDetail(taskId: string): Promise<void> {
           </div>
         </div>
       ` : ""}
+
+      <!-- Attachments Section -->
+      <div class="attachments-section" style="margin-top:1.5rem;">
+        <div class="attachments-header">
+          <div class="detail-label" style="font-size:0.85rem;">Attachments</div>
+          <label class="upload-btn" title="Upload files">
+            <input type="file" id="file-input" multiple hidden />
+            <span>+ Add files</span>
+          </label>
+        </div>
+        <div class="attachments-dropzone" id="dropzone">
+          <p>Drop files here or click to upload</p>
+          <input type="file" id="dropzone-input" multiple hidden />
+        </div>
+        <div class="attachments-list" id="attachments-list">
+          <div class="loading" style="text-align:center;padding:1rem;color:var(--text-secondary);">Loading attachments...</div>
+        </div>
+      </div>
     `;
 
     // Wire up link chip clicks
@@ -670,6 +689,9 @@ async function loadTaskDetail(taskId: string): Promise<void> {
         alert("Failed to update task: " + (e instanceof Error ? e.message : "Unknown error"));
       }
     });
+
+    // Initialize attachments
+    initAttachments(taskId);
   } catch (e) {
     el.innerHTML = `<div class="error-state">Failed to load task: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
@@ -711,4 +733,113 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ── Attachments ──
+
+let _currentAttachmentTaskId: string | null = null;
+
+function initAttachments(taskId: string): void {
+  _currentAttachmentTaskId = taskId;
+
+  // Upload via button
+  const fileInput = document.getElementById("file-input") as HTMLInputElement;
+  if (fileInput) {
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files?.length) {
+        handleAttachmentUpload(fileInput.files);
+        fileInput.value = "";
+      }
+    });
+  }
+
+  // Drag-and-drop zone
+  const dropzone = document.getElementById("dropzone");
+  const dropzoneInput = document.getElementById("dropzone-input") as HTMLInputElement;
+
+  if (dropzone) {
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dragover");
+    });
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer?.files.length) {
+        handleAttachmentUpload(e.dataTransfer.files);
+      }
+    });
+    dropzone.addEventListener("click", () => dropzoneInput?.click());
+  }
+
+  if (dropzoneInput) {
+    dropzoneInput.addEventListener("change", () => {
+      if (dropzoneInput.files?.length) {
+        handleAttachmentUpload(dropzoneInput.files);
+        dropzoneInput.value = "";
+      }
+    });
+  }
+
+  loadAttachments();
+}
+
+async function loadAttachments(): Promise<void> {
+  if (!_currentAttachmentTaskId) return;
+  const list = document.getElementById("attachments-list");
+  if (!list) return;
+
+  list.innerHTML = '<div class="loading" style="text-align:center;padding:1rem;color:var(--text-secondary);">Loading attachments...</div>';
+
+  try {
+    const attachments = await getAttachments(_currentAttachmentTaskId);
+    if (attachments.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="text-align:center;padding:1rem;color:var(--text-muted);">No attachments yet</div>';
+      return;
+    }
+
+    list.innerHTML = attachments
+      .map(
+        (att) => `
+      <div class="attachment-item" data-id="${att.id}">
+        <span class="attachment-icon">${getFileIcon(att.mime_type)}</span>
+        <div class="attachment-info">
+          <a href="${getDownloadUrl(att.id)}" class="attachment-name" target="_blank">${att.original_name}</a>
+          <span class="attachment-meta">${formatFileSize(att.size)} · ${new Date(att.uploaded_at * 1000).toLocaleDateString()}${att.is_unsafe ? ' · <span style="color:var(--accent-rose);">⚠ Unsafe</span>' : ""}</span>
+        </div>
+        <button class="attachment-delete" data-id="${att.id}" title="Delete attachment">🗑</button>
+      </div>
+    `
+      )
+      .join("");
+
+    // Wire up delete buttons
+    list.querySelectorAll(".attachment-delete").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number((btn as HTMLElement).dataset.id);
+        if (confirm("Delete this attachment?")) {
+          await deleteAttachment(id);
+          loadAttachments();
+        }
+      });
+    });
+  } catch (err: any) {
+    list.innerHTML = `<div class="error" style="text-align:center;padding:1rem;color:var(--accent-rose);">Failed to load attachments: ${err.message}</div>`;
+  }
+}
+
+async function handleAttachmentUpload(files: FileList | File[]): Promise<void> {
+  if (!_currentAttachmentTaskId) return;
+  try {
+    const result = await uploadAttachments(_currentAttachmentTaskId, files);
+    loadAttachments();
+    if (result.blocked) {
+      alert(result.message || "Potentially unsafe files detected. Task has been moved to Blocked status.");
+    }
+  } catch (err: any) {
+    alert(`Upload failed: ${err.message}`);
+  }
 }

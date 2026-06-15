@@ -88,6 +88,24 @@ export interface FsReadResponse {
   error?: string;
 }
 
+export interface TaskAttachment {
+  id: number;
+  task_id?: string;
+  original_name: string;
+  stored_name?: string;
+  size: number;
+  mime_type: string;
+  is_unsafe: number;
+  uploaded_by: string;
+  uploaded_at: number;
+}
+
+export interface TaskAttachmentUploadResponse {
+  attachments: TaskAttachment[];
+  blocked?: boolean;
+  message?: string;
+}
+
 export interface AgentSessionSummary {
   session_id: string;
   first_event: string;
@@ -245,6 +263,15 @@ export interface KanbanLink {
 
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "Unknown error");
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
   if (!res.ok) {
     const text = await res.text().catch(() => "Unknown error");
     throw new Error(`${res.status}: ${text}`);
