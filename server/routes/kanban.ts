@@ -7,8 +7,12 @@ import { join } from "path";
 const KANBAN_DB = "/opt/data/kanban.db";
 
 function shellQuote(s: string): string {
-  const escaped = s.replace(/["$\\`]/g, "\\$&");
+  const escaped = s.replace(/["\$\\`]/g, "\\$&");
   return `"${escaped}"`;
+}
+
+function sqlQuote(s: string): string {
+  return `'${s.replace(/'/g, "''")}'`;
 }
 
 function queryKanban(sql: string, timeoutSec: number = 10): any[] {
@@ -94,7 +98,7 @@ kanbanRouter.get("/tasks/:id", (req, res) => {
              created_at, started_at, completed_at, session_id,
              current_run_id, last_failure_error, max_runtime_seconds,
              consecutive_failures, skills, model_override
-      FROM tasks WHERE id = ${shellQuote(taskId)}
+      FROM tasks WHERE id = ${sqlQuote(taskId)}
     `);
 
     if (tasks.length === 0) {
@@ -104,13 +108,13 @@ kanbanRouter.get("/tasks/:id", (req, res) => {
 
     const comments = queryKanban(`
       SELECT id, task_id, author, body, created_at
-      FROM task_comments WHERE task_id = ${shellQuote(taskId)}
+      FROM task_comments WHERE task_id = ${sqlQuote(taskId)}
       ORDER BY created_at ASC
     `);
 
     const events = queryKanban(`
       SELECT id, task_id, run_id, kind, payload, created_at
-      FROM task_events WHERE task_id = ${shellQuote(taskId)}
+      FROM task_events WHERE task_id = ${sqlQuote(taskId)}
       ORDER BY created_at DESC
       LIMIT 100
     `);
@@ -118,13 +122,13 @@ kanbanRouter.get("/tasks/:id", (req, res) => {
     const runs = queryKanban(`
       SELECT id, task_id, profile, status, started_at, ended_at,
              outcome, summary, error
-      FROM task_runs WHERE task_id = ${shellQuote(taskId)}
+      FROM task_runs WHERE task_id = ${sqlQuote(taskId)}
       ORDER BY started_at DESC
     `);
 
     const links = queryKanban(`
       SELECT parent_id, child_id FROM task_links
-      WHERE parent_id = ${shellQuote(taskId)} OR child_id = ${shellQuote(taskId)}
+      WHERE parent_id = ${sqlQuote(taskId)} OR child_id = ${sqlQuote(taskId)}
     `);
 
     res.json({ ...tasks[0], comments, events, runs, links });
