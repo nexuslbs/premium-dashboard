@@ -139,18 +139,44 @@ async function loadBoard(): Promise<void> {
       });
     });
 
-    // Wire up move button handlers
+    // Wire up move dropdown toggle
+    document.querySelectorAll(".kanban-move-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
+        if (!taskId) return;
+        // Close all other dropdowns
+        document.querySelectorAll(".kanban-move-dropdown").forEach((d) => {
+          if (d.getAttribute("data-task-id") !== taskId) {
+            (d as HTMLElement).style.display = "none";
+          }
+        });
+        // Toggle this dropdown
+        const dropdown = document.querySelector(`.kanban-move-dropdown[data-task-id="${taskId}"]`) as HTMLElement;
+        if (dropdown) {
+          dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
+        }
+      });
+    });
+    // Wire up dropdown move buttons
     document.querySelectorAll(".kanban-move-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const card = (e.target as HTMLElement).closest(".kanban-card");
-        const taskId = card?.getAttribute("data-task-id");
+        const dropdown = (e.target as HTMLElement).closest(".kanban-move-dropdown") as HTMLElement;
+        const taskId = dropdown?.getAttribute("data-task-id");
         const moveTo = (e.target as HTMLElement).getAttribute("data-move-to");
         if (taskId && moveTo) {
+          if (dropdown) dropdown.style.display = "none";
           moveTask(taskId, moveTo);
         }
       });
     });
+    // Close dropdowns on outside click
+    document.addEventListener("click", () => {
+      document.querySelectorAll(".kanban-move-dropdown").forEach((d) => {
+        (d as HTMLElement).style.display = "none";
+      });
+    }, { once: false });
 
     // Wire up drag and drop handlers (programmatic, not inline — ES modules scope)
     document.querySelectorAll(".kanban-card").forEach((card) => {
@@ -158,6 +184,7 @@ async function loadBoard(): Promise<void> {
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
         if (taskId && (e as DragEvent).dataTransfer) {
           (e as DragEvent).dataTransfer!.setData("text/plain", taskId);
+          (e as DragEvent).dataTransfer!.setData("source-col", (e.currentTarget as HTMLElement).closest(".kanban-col-body")?.getAttribute("data-column") || "");
           (e as DragEvent).dataTransfer!.effectAllowed = "move";
         }
       });
@@ -176,6 +203,31 @@ async function loadBoard(): Promise<void> {
         const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
         const newStatus = colBody?.getAttribute("data-column");
         if (!newStatus) return;
+
+        const sourceCol = (e as DragEvent).dataTransfer?.getData("source-col");
+
+        // Intra-column reorder: drop on another card in same column
+        if (sourceCol === newStatus) {
+          const targetCard = (e.target as HTMLElement).closest(".kanban-card");
+          if (targetCard) {
+            const targetId = targetCard.getAttribute("data-task-id");
+            if (targetId && targetId !== taskId) {
+              try {
+                await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/reorder", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ targetId, position: "before" }),
+                });
+                loadBoard();
+                return;
+              } catch (err) {
+                console.error("Reorder failed:", err);
+              }
+            }
+          }
+        }
+
+        // Cross-column move (existing logic)
         try {
           await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/status", {
             method: "PATCH",
@@ -253,10 +305,14 @@ function renderTaskCard(task: KanbanTask): string {
         <span class="kanban-time">${timeAgo}</span>
       </div>
       <div class="kanban-card-actions" style="display:flex;flex-wrap:wrap;gap:0.25rem;padding:0.375rem 0.5rem;border-top:1px solid var(--glass-border,rgba(255,255,255,0.06));margin-top:0.25rem;">
-        <button class="kanban-move-btn" data-move-to="todo" style="${status === "todo" ? "display:none;" : ""}background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);color:var(--accent-purple);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">Todo</button>
-        <button class="kanban-move-btn" data-move-to="in_progress" style="${status === "in_progress" ? "display:none;" : ""}background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.2);color:var(--accent-cyan);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">In Progress</button>
-        <button class="kanban-move-btn" data-move-to="done" style="${status === "done" ? "display:none;" : ""}background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);color:var(--accent-emerald);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">Done</button>
-        <button class="kanban-move-btn" data-move-to="blocked" style="${status === "blocked" ? "display:none;" : ""}background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.2);color:var(--accent-rose);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">Blocked</button>
+        <div style="position:relative;">
+          <button class="kanban-move-toggle" data-task-id="${task.id}" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">↳ Move</button>
+          <div class="kanban-move-dropdown" data-task-id="${task.id}" style="display:none;position:absolute;top:100%;left:0;z-index:10;background:#1a1a2e;border:1px solid var(--glass-border);border-radius:6px;padding:0.25rem;min-width:110px;box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+            ${["todo","in_progress","done","blocked"].filter(s => s !== status).map(s =>
+              `<button class="kanban-move-btn" data-move-to="${s}" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text-primary);padding:0.3rem 0.5rem;cursor:pointer;font-size:0.7rem;border-radius:4px;">→ ${s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}</button>`
+            ).join("")}
+          </div>
+        </div>
       </div>
     </div>
   `;

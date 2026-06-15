@@ -59,7 +59,21 @@ function execKanban(sql: string, timeoutSec: number = 10): void {
   });
 }
 
+function execKanbanRaw(sql: string): void {
+  const cmd = [
+    `sqlite3`,
+    shellQuote(KANBAN_DB),
+    shellQuote(sql),
+  ].join(" ");
+  execSync(cmd, { encoding: "utf-8", shell: "/bin/sh", timeout: 5000 });
+}
+
 export const kanbanRouter = Router();
+
+// Run schema migration: add sort_order column if missing
+try {
+  execKanbanRaw("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;");
+} catch {} // Ignore if column already exists
 
 // ── GET /api/kanban/board — Tasks grouped by status ──
 kanbanRouter.get("/board", (_req, res) => {
@@ -68,9 +82,10 @@ kanbanRouter.get("/board", (_req, res) => {
       SELECT id, title, body, assignee, status, priority, created_by,
              created_at, started_at, completed_at, session_id,
              current_run_id, last_failure_error, max_runtime_seconds,
-             consecutive_failures, skills, model_override
+             consecutive_failures, skills, model_override,
+             sort_order
       FROM tasks
-      ORDER BY priority DESC, created_at DESC
+      ORDER BY priority DESC, sort_order ASC, created_at DESC
     `);
 
     // Group into columns
@@ -112,7 +127,8 @@ kanbanRouter.get("/tasks/:id", (req, res) => {
       SELECT id, title, body, assignee, status, priority, created_by,
              created_at, started_at, completed_at, session_id,
              current_run_id, last_failure_error, max_runtime_seconds,
-             consecutive_failures, skills, model_override
+             consecutive_failures, skills, model_override,
+             sort_order
       FROM tasks WHERE id = ${sqlQuote(taskId)}
     `);
 
@@ -167,8 +183,12 @@ kanbanRouter.post("/tasks", (req, res) => {
     const taskStatus = status || "todo";
     const taskPriority = priority != null ? priority : 0;
 
+    // Get next sort_order for this status
+    const maxTasks = queryKanban(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM tasks WHERE status = ${sqlQuote(taskStatus)}`);
+    const sortOrder = maxTasks.length > 0 ? maxTasks[0].next_order : 0;
+
     const sql = `
-      INSERT INTO tasks (id, title, body, assignee, status, priority, created_by, created_at, skills, model_override)
+      INSERT INTO tasks (id, title, body, assignee, status, priority, created_by, created_at, skills, model_override, sort_order)
       VALUES (
         ${sqlQuote(id)},
         ${sqlQuote(title.trim())},
@@ -179,7 +199,8 @@ kanbanRouter.post("/tasks", (req, res) => {
         ${sqlQuote("dashboard")},
         ${now},
         ${skills != null ? sqlQuote(JSON.stringify(skills)) : "NULL"},
-        ${model_override != null ? sqlQuote(model_override) : "NULL"}
+        ${model_override != null ? sqlQuote(model_override) : "NULL"},
+        ${sortOrder}
       )
     `;
 
@@ -218,8 +239,12 @@ kanbanRouter.patch("/tasks/:id/status", (req, res) => {
     const oldStatus = tasks[0].status;
     const now = Math.floor(Date.now() / 1000);
 
+    // Get next sort_order in the new column (goes to the end)
+    const maxNew = queryKanban(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM tasks WHERE status = ${sqlQuote(status)}`);
+    const newOrder = maxNew.length > 0 ? maxNew[0].next_order : 0;
+
     // Build SET clause
-    const setClauses = [`status = ${sqlQuote(status)}`];
+    const setClauses = [`status = ${sqlQuote(status)}`, `sort_order = ${newOrder}`];
 
     // If moving to "done" and wasn't done before, set completed_at
     if (status === "done" && oldStatus !== "done") {
@@ -236,6 +261,49 @@ kanbanRouter.patch("/tasks/:id/status", (req, res) => {
     res.json({ success: true });
   } catch (e: any) {
     console.error("Kanban update status error:", e?.message || e);
+    res.status(500).json({ error: e.message || "Unknown error" });
+  }
+});
+
+// ── PATCH /api/kanban/tasks/:id/reorder — Reorder task within a column ──
+kanbanRouter.patch("/tasks/:id/reorder", (req, res) => {
+  try {
+    const rawId = req.params.id;
+    if (!/^[a-zA-Z0-9_-]+$/.test(rawId)) {
+      res.status(400).json({ error: "Invalid task ID" });
+      return;
+    }
+    const { targetId, position } = req.body; // targetId: string, position: "before" | "after"
+    if (!targetId || !position) {
+      res.status(400).json({ error: "targetId and position required" });
+      return;
+    }
+
+    // Get current sort_order of the dragged task
+    const dragTask = queryKanban(`SELECT status, sort_order FROM tasks WHERE id = ${sqlQuote(rawId)}`);
+    if (dragTask.length === 0) {
+      res.status(404).json({ error: "Task not found" });
+      return;
+    }
+
+    const targetTask = queryKanban(`SELECT sort_order FROM tasks WHERE id = ${sqlQuote(targetId)}`);
+    if (targetTask.length === 0) {
+      res.status(404).json({ error: "Target task not found" });
+      return;
+    }
+
+    const targetOrder = targetTask[0].sort_order;
+    const newOrder = position === "before" ? targetOrder : targetOrder + 1;
+
+    // Shift other tasks in the same column to make room
+    execKanbanRaw(`UPDATE tasks SET sort_order = sort_order + 1 WHERE status = ${sqlQuote(dragTask[0].status)} AND sort_order >= ${newOrder} AND id != ${sqlQuote(rawId)}`);
+
+    // Update the dragged task
+    execKanbanRaw(`UPDATE tasks SET sort_order = ${newOrder} WHERE id = ${sqlQuote(rawId)}`);
+
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error("Kanban reorder error:", e?.message || e);
     res.status(500).json({ error: e.message || "Unknown error" });
   }
 });
