@@ -151,6 +151,43 @@ async function loadBoard(): Promise<void> {
         }
       });
     });
+
+    // Wire up drag and drop handlers (programmatic, not inline — ES modules scope)
+    document.querySelectorAll(".kanban-card").forEach((card) => {
+      card.addEventListener("dragstart", (e) => {
+        const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
+        if (taskId && (e as DragEvent).dataTransfer) {
+          (e as DragEvent).dataTransfer!.setData("text/plain", taskId);
+          (e as DragEvent).dataTransfer!.effectAllowed = "move";
+        }
+      });
+    });
+    document.querySelectorAll(".kanban-col-body").forEach((col) => {
+      col.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if ((e as DragEvent).dataTransfer) {
+          (e as DragEvent).dataTransfer!.dropEffect = "move";
+        }
+      });
+      col.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        const taskId = (e as DragEvent).dataTransfer?.getData("text/plain");
+        if (!taskId) return;
+        const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
+        const newStatus = colBody?.getAttribute("data-column");
+        if (!newStatus) return;
+        try {
+          await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/status", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+          });
+          loadBoard();
+        } catch (err) {
+          console.error("Drop move failed:", err);
+        }
+      });
+    });
   } catch (e) {
     boardEl.innerHTML = `<div class="error-state">Failed to load board: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
@@ -182,7 +219,7 @@ function renderColumn(id: string, title: string, tasks: KanbanTask[]): string {
         <span class="kanban-col-title">${title}</span>
         <span class="kanban-col-count">${tasks.length}</span>
       </div>
-      <div class="kanban-col-body" data-column="${id}" ondragover="onColumnDragOver(event)" ondrop="onColumnDrop(event)">
+      <div class="kanban-col-body" data-column="${id}">
         ${tasks.length === 0 ? `<div class="kanban-empty">No tasks</div>` :
           tasks.map((t) => renderTaskCard(t)).join("")}
       </div>
@@ -204,7 +241,7 @@ function renderTaskCard(task: KanbanTask): string {
   const status = task.status || "todo";
 
   return `
-    <div class="kanban-card" data-task-id="${task.id}" draggable="true" ondragstart="onCardDragStart(event)">
+    <div class="kanban-card" data-task-id="${task.id}" draggable="true">
       <div class="kanban-card-top">
         <span class="kanban-priority ${priorityClass}">${priorityLabel}</span>
         ${task.last_failure_error ? `<span class="kanban-error-dot" title="Has failures">⚠</span>` : ""}
@@ -543,46 +580,4 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
-}
-
-// ── Drag and Drop Handlers ──
-
-// @ts-ignore - used via inline HTML ondragstart handler
-function onCardDragStart(e: DragEvent): void {
-  const card = (e.target as HTMLElement).closest('.kanban-card');
-  const taskId = card?.getAttribute('data-task-id');
-  if (taskId && e.dataTransfer) {
-    e.dataTransfer.setData('text/plain', taskId);
-    e.dataTransfer.effectAllowed = 'move';
-  }
-}
-
-// @ts-ignore - used via inline HTML ondragover handler
-function onColumnDragOver(e: DragEvent): void {
-  e.preventDefault();
-  if (e.dataTransfer) {
-    e.dataTransfer.dropEffect = 'move';
-  }
-}
-
-// @ts-ignore - used via inline HTML ondrop handler
-async function onColumnDrop(e: DragEvent): Promise<void> {
-  e.preventDefault();
-  const taskId = e.dataTransfer?.getData('text/plain');
-  if (!taskId) return;
-
-  const colBody = (e.target as HTMLElement).closest('.kanban-col-body');
-  const newStatus = colBody?.getAttribute('data-column');
-  if (!newStatus) return;
-
-  try {
-    await fetch('/api/kanban/tasks/' + encodeURIComponent(taskId) + '/status', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    loadBoard();
-  } catch (err) {
-    console.error('Drop move failed:', err);
-  }
 }
