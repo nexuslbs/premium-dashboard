@@ -231,30 +231,44 @@ async function loadBoard(): Promise<void> {
             const targetId = targetCard.getAttribute("data-task-id");
             if (targetId && targetId !== taskId) {
               try {
-                await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/reorder", {
+                const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/reorder", {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ targetId, position: "before" }),
                 });
+                if (!res.ok) {
+                  const text = await res.text().catch(() => "Unknown error");
+                  console.error("Reorder failed:", `${res.status}: ${text}`);
+                }
                 loadBoard();
-                return;
               } catch (err) {
                 console.error("Reorder failed:", err);
+                loadBoard(); // reload anyway to show current state
               }
+              return; // ← CRITICAL: always return when sourceCol === newStatus to prevent fallthrough to status endpoint
             }
           }
+          // Dropped within same column but no card target (between cards / empty area)
+          // Don't call status endpoint — just reload to show current order
+          loadBoard();
+          return; // ← CRITICAL: always return when sourceCol === newStatus
         }
 
-        // Cross-column move (existing logic)
+        // Cross-column move
         try {
-          await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/status", {
+          const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/status", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: newStatus }),
           });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "Unknown error");
+            console.error("Status move failed:", `${res.status}: ${text}`);
+          }
           loadBoard();
         } catch (err) {
           console.error("Drop move failed:", err);
+          loadBoard();
         }
       });
     });
@@ -284,7 +298,9 @@ function renderColumn(id: string, title: string, tasks: KanbanTask[]): string {
   const colorClass =
     id === "backlog" ? "kanban-col-neutral" :
     id === "todo" ? "kanban-col-purple" :
-    id === "in_progress" ? "kanban-col-cyan" :
+    id === "ready" ? "kanban-col-orange" :
+    id === "running" || id === "in_progress" ? "kanban-col-cyan" :
+    id === "review" ? "kanban-col-sky" :
     id === "done" ? "kanban-col-emerald" :
     id === "blocked" ? "kanban-col-rose" : "kanban-col-neutral";
 
@@ -314,6 +330,11 @@ function renderTaskCard(task: KanbanTask): string {
   const timeAgo = formatRelativeTime(task.created_at);
 
   const status = task.status || "todo";
+  const moveableStatuses = ["backlog","todo","ready","running","done","blocked"];
+  const statusLabels: Record<string, string> = {
+    backlog: "Backlog", todo: "Todo", ready: "Ready",
+    running: "Running", done: "Done", blocked: "Blocked",
+  };
 
   return `
     <div class="kanban-card" data-task-id="${task.id}" draggable="true">
@@ -331,8 +352,8 @@ function renderTaskCard(task: KanbanTask): string {
         <div style="position:relative;">
           <button class="kanban-move-toggle" data-task-id="${task.id}" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">↳ Move</button>
           <div class="kanban-move-dropdown" data-task-id="${task.id}" style="display:none;position:absolute;top:100%;left:0;z-index:10;background:#1a1a2e;border:1px solid var(--glass-border);border-radius:6px;padding:0.25rem;min-width:110px;box-shadow:0 4px 12px rgba(0,0,0,0.4);">
-            ${["backlog","todo","in_progress","done","blocked"].filter(s => s !== status).map(s => 
-              `<button class="kanban-move-btn" data-move-to="${s}" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text-primary);padding:0.3rem 0.5rem;cursor:pointer;font-size:0.7rem;border-radius:4px;">→ ${s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}</button>`
+            ${moveableStatuses.filter(s => s !== status).map(s => 
+              `<button class="kanban-move-btn" data-move-to="${s}" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text-primary);padding:0.3rem 0.5rem;cursor:pointer;font-size:0.7rem;border-radius:4px;">→ ${statusLabels[s] || s.charAt(0).toUpperCase() + s.slice(1)}</button>`
             ).join("")}
           </div>
         </div>
@@ -636,9 +657,12 @@ async function loadTaskDetail(taskId: string): Promise<void> {
 
 function statusBadge(status: string): string {
   switch (status) {
-    case "backlog": return "badge-neutral";
+    case "backlog": case "triage": return "badge-neutral";
+    case "todo": case "scheduled": return "badge-neutral";
+    case "ready": return "badge-info";
+    case "running": case "in_progress": return "badge-warning";
+    case "review": return "badge-info";
     case "done": return "badge-success";
-    case "in_progress": return "badge-warning";
     case "blocked": return "badge-error";
     default: return "badge-neutral";
   }

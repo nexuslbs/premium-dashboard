@@ -1998,6 +1998,12 @@ tr:hover td {
 .kanban-col-neutral .kanban-col-header {
   border-top: 3px solid var(--text-muted);
 }
+.kanban-col-orange .kanban-col-header {
+  border-top: 3px solid var(--accent-amber);
+}
+.kanban-col-sky .kanban-col-header {
+  border-top: 3px solid var(--accent-blue);
+}
 
 .kanban-col-title {
   font-size: 0.875rem;

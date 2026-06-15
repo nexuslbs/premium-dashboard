@@ -75,6 +75,44 @@ try {
   execKanbanRaw("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;");
 } catch {} // Ignore if column already exists
 
+// ── All statuses the dashboard can display, mapped to column IDs ──
+// Hermes uses: triage, back log, todo, scheduled, ready, running, review, reclaimed, done, blocked
+const STATUS_MAP: Record<string, { column: string; title: string; order: number }> = {
+  "backlog":     { column: "backlog",     title: "Backlog",     order: 0 },
+  "triage":      { column: "backlog",     title: "Backlog",     order: 0 },
+  "todo":        { column: "todo",        title: "Todo",        order: 1 },
+  "scheduled":   { column: "todo",        title: "Todo",        order: 1 },
+  "ready":       { column: "ready",       title: "Ready",       order: 2 },
+  "running":     { column: "running",     title: "In Progress", order: 3 },
+  "in_progress": { column: "running",     title: "In Progress", order: 3 },
+  "review":      { column: "review",      title: "Review",      order: 4 },
+  "done":        { column: "done",        title: "Done",        order: 5 },
+  "blocked":     { column: "blocked",     title: "Blocked",     order: 6 },
+  "reclaimed":   { column: "unknown",     title: "Unknown",     order: 7 },
+};
+
+function lookupStatus(rawStatus: string): { column: string; title: string } {
+  const entry = STATUS_MAP[rawStatus];
+  if (entry) return { column: entry.column, title: entry.title };
+  return { column: "unknown", title: "Unknown" };
+}
+
+// ── Column display order (used when rendering columns) ──
+const COLUMN_ORDER = [
+  { id: "backlog", title: "Backlog" },
+  { id: "todo",    title: "Todo" },
+  { id: "ready",   title: "Ready" },
+  { id: "running", title: "In Progress" },
+  { id: "review",  title: "Review" },
+  { id: "done",    title: "Done" },
+  { id: "blocked", title: "Blocked" },
+  { id: "unknown", title: "Unknown" },
+];
+
+// ── Statuses users can move tasks to via the Move dropdown ──
+const MOVEABLE_STATUSES = ["backlog", "todo", "ready", "running", "done", "blocked"];
+const MOVEABLE_STATUS_SET = new Set(MOVEABLE_STATUSES);
+
 // ── GET /api/kanban/board — Tasks grouped by status ──
 kanbanRouter.get("/board", (_req, res) => {
   try {
@@ -85,29 +123,21 @@ kanbanRouter.get("/board", (_req, res) => {
              consecutive_failures, skills, model_override,
              sort_order
       FROM tasks
+      WHERE status != 'archived'
       ORDER BY priority DESC, sort_order ASC, created_at DESC
     `);
 
-    // Group into columns
-    const statusOrder = ["backlog", "todo", "in_progress", "done", "blocked"];
-    const columns = statusOrder.map((s) => ({
-      id: s,
-      title: s === "todo" ? "Todo" : s === "in_progress" ? "In Progress" : s === "done" ? "Done" : s === "blocked" ? "Blocked" : "Backlog",
-      tasks: tasks.filter((t: any) => t.status === s),
+    // Group tasks by their display column using the STATUS_MAP
+    const columns = COLUMN_ORDER.map((col) => ({
+      id: col.id,
+      title: col.title,
+      tasks: tasks.filter((t: any) => lookupStatus(t.status).column === col.id),
     }));
 
-    // Also catch any tasks with truly unknown status (shouldn't happen)
-    const known = new Set(statusOrder);
-    const ungrouped = tasks.filter((t: any) => !known.has(t.status));
-    if (ungrouped.length > 0) {
-      columns.unshift({
-        id: "unknown",
-        title: "Unknown",
-        tasks: ungrouped,
-      });
-    }
+    // Remove Unknown column if empty, keep all others (even empty) for stable layout
+    const filtered = columns.filter((c) => c.id !== "unknown" || c.tasks.length > 0);
 
-    res.json({ columns, total: tasks.length });
+    res.json({ columns: filtered, total: tasks.length });
   } catch (e: any) {
     console.error("Kanban board error:", e?.message || e);
     res.status(500).json({ error: e.message || "Unknown error" });
@@ -223,9 +253,8 @@ kanbanRouter.patch("/tasks/:id/status", (req, res) => {
     const taskId = rawId;
 
     const { status } = req.body;
-    const validStatuses = ["backlog", "todo", "in_progress", "done", "blocked"];
-    if (!validStatuses.includes(status)) {
-      res.status(400).json({ error: `Status must be one of: ${validStatuses.join(", ")}` });
+    if (!MOVEABLE_STATUS_SET.has(status)) {
+      res.status(400).json({ error: `Status must be one of: ${MOVEABLE_STATUSES.join(", ")}` });
       return;
     }
 
@@ -350,9 +379,8 @@ kanbanRouter.patch("/tasks/:id", (req, res) => {
       setClauses.push(`model_override = ${sqlQuote(model_override)}`);
     }
     if (status !== undefined) {
-      const validStatuses = ["backlog", "todo", "in_progress", "done", "blocked"];
-      if (!validStatuses.includes(status)) {
-        res.status(400).json({ error: `Status must be one of: ${validStatuses.join(", ")}` });
+      if (!MOVEABLE_STATUS_SET.has(status)) {
+        res.status(400).json({ error: `Status must be one of: ${MOVEABLE_STATUSES.join(", ")}` });
         return;
       }
       setClauses.push(`status = ${sqlQuote(status)}`);

@@ -4,7 +4,7 @@ import { join, resolve } from "path";
 
 // The premium-dashboard container is accessible on hermes-net at 172.21.0.7
 // Nginx serves on port 80, proxying /api/ to the Node server on 3001
-const BASE = "http://172.21.0.7";
+const BASE = "http://172.18.0.8";
 const DIST_DIR = resolve(__dirname, "..", "dist");
 
 // Helper: fetch JSON and check status
