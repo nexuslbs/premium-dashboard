@@ -130,7 +130,9 @@ async function loadBoard(): Promise<void> {
 
     // Wire up card click handlers for navigation
     document.querySelectorAll(".kanban-card").forEach((card) => {
-      card.addEventListener("click", () => {
+      card.addEventListener("click", (e) => {
+        // Don't navigate if clicking a button or interactive element
+        if ((e.target as HTMLElement).closest("button, select, input, textarea, .kanban-move-dropdown")) return;
         const taskId = card.getAttribute("data-task-id");
         if (taskId) {
           history.pushState({}, "", `/kanban/${taskId}`);
@@ -181,6 +183,11 @@ async function loadBoard(): Promise<void> {
     // Wire up drag and drop handlers (programmatic, not inline — ES modules scope)
     document.querySelectorAll(".kanban-card").forEach((card) => {
       card.addEventListener("dragstart", (e) => {
+        // Don't start drag if interacting with a button/input
+        if ((e.target as HTMLElement).closest("button, select, input, textarea")) {
+          e.preventDefault();
+          return;
+        }
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
         if (taskId && (e as DragEvent).dataTransfer) {
           (e as DragEvent).dataTransfer!.setData("text/plain", taskId);
