@@ -1,6 +1,10 @@
 import { apiGet, apiPost, type KanbanBoard, type KanbanTask, type KanbanTaskDetail } from "../lib/api";
 import { router } from "../lib/router";
 
+// ── Drag-and-drop state (module-level, survives loadBoard re-renders) ──
+let _dragTaskId: string | null = null;
+let _dragSourceCol: string | null = null;
+
 export function renderKanban(container: HTMLElement): void {
   container.innerHTML = `
     <div class="page-header">
@@ -201,8 +205,9 @@ async function loadBoard(): Promise<void> {
         }
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
         if (taskId && (e as DragEvent).dataTransfer) {
+          _dragTaskId = taskId;
+          _dragSourceCol = (e.currentTarget as HTMLElement).closest(".kanban-col-body")?.getAttribute("data-column") || null;
           (e as DragEvent).dataTransfer!.setData("text/plain", taskId);
-          (e as DragEvent).dataTransfer!.setData("source-col", (e.currentTarget as HTMLElement).closest(".kanban-col-body")?.getAttribute("data-column") || "");
           (e as DragEvent).dataTransfer!.effectAllowed = "move";
         }
       });
@@ -216,42 +221,43 @@ async function loadBoard(): Promise<void> {
       });
       col.addEventListener("drop", async (e) => {
         e.preventDefault();
-        const taskId = (e as DragEvent).dataTransfer?.getData("text/plain");
-        if (!taskId) return;
+        // Use module-level drag state (reliable across all browsers)
+        const taskId = _dragTaskId;
+        const sourceCol = _dragSourceCol;
+        if (!taskId || sourceCol === null) return;
+        _dragTaskId = null;
+        _dragSourceCol = null;
         const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
         const newStatus = colBody?.getAttribute("data-column");
         if (!newStatus) return;
 
-        const sourceCol = (e as DragEvent).dataTransfer?.getData("source-col");
-
-        // Intra-column reorder: drop on another card in same column
+        // Intra-column reorder: drop in same column
         if (sourceCol === newStatus) {
-          const targetCard = (e.target as HTMLElement).closest(".kanban-card");
           let targetId: string | null = null;
+          // Try direct card under cursor first
+          const targetCard = (e.target as HTMLElement).closest(".kanban-card");
           if (targetCard) {
             targetId = targetCard.getAttribute("data-task-id");
-          } else {
-            // No card directly under cursor — find the nearest card by Y position
-            const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
-            if (colBody) {
-              const cards = colBody.querySelectorAll<HTMLElement>(".kanban-card");
-              const dropY = (e as DragEvent).clientY;
-              let closestCard: HTMLElement | null = null;
-              let closestDist = Infinity;
-              for (const card of cards) {
-                const rect = card.getBoundingClientRect();
-                const midY = rect.top + rect.height / 2;
-                const dist = Math.abs(dropY - midY);
-                if (dist < closestDist) {
-                  closestDist = dist;
-                  closestCard = card;
-                }
+          }
+          // No direct card — find nearest by Y position
+          if (!targetId && colBody) {
+            const cards = colBody.querySelectorAll<HTMLElement>(".kanban-card");
+            const dropY = (e as DragEvent).clientY;
+            let closestCard: HTMLElement | null = null;
+            let closestDist = Infinity;
+            for (const card of cards) {
+              const rect = card.getBoundingClientRect();
+              const midY = rect.top + rect.height / 2;
+              const dist = Math.abs(dropY - midY);
+              if (dist < closestDist) {
+                closestDist = dist;
+                closestCard = card;
               }
-              if (closestCard) {
-                const nearestId = closestCard.getAttribute("data-task-id");
-                if (nearestId && nearestId !== taskId) {
-                  targetId = nearestId;
-                }
+            }
+            if (closestCard) {
+              const nearestId = closestCard.getAttribute("data-task-id");
+              if (nearestId && nearestId !== taskId) {
+                targetId = nearestId;
               }
             }
           }
@@ -266,16 +272,12 @@ async function loadBoard(): Promise<void> {
                 const text = await res.text().catch(() => "Unknown error");
                 console.error("Reorder failed:", `${res.status}: ${text}`);
               }
-              loadBoard();
             } catch (err) {
               console.error("Reorder failed:", err);
-              loadBoard(); // reload anyway to show current state
             }
-          } else {
-            // No suitable target found — just reload
-            loadBoard();
           }
-          return; // ← CRITICAL: always return when sourceCol === newStatus to prevent fallthrough to status endpoint
+          loadBoard();
+          return; // ← CRITICAL: always return when same column to prevent fallthrough
         }
 
         // Cross-column move
