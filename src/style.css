@@ -1167,6 +1167,34 @@ tr:hover td {
   color: var(--text-muted);
 }
 
+.file-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.file-download-btn:hover {
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
 /* Markdown rendered content */
 .markdown-content {
   padding: 1.5rem 2rem;

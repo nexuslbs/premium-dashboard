@@ -451,7 +451,10 @@ async function openFile(path: string): Promise<void> {
       contentView.innerHTML = `
         <div class="file-header">
           <span class="file-path">${escapeHtml(path)}</span>
-          <span class="file-size">${formatSize(response.size)}</span>
+          <div class="file-header-actions">
+            <a class="file-download-btn" href="/api/fs/download?path=${encodeURIComponent(path)}" download title="Download file">⬇</a>
+            <span class="file-size">${formatSize(response.size)}</span>
+          </div>
         </div>
         <div class="markdown-content">${rendered}</div>
       `;
@@ -463,7 +466,10 @@ async function openFile(path: string): Promise<void> {
       contentView.innerHTML = `
         <div class="file-header">
           <span class="file-path">${escapeHtml(path)}</span>
-          <span class="file-size">${formatSize(response.size)}</span>
+          <div class="file-header-actions">
+            <a class="file-download-btn" href="/api/fs/download?path=${encodeURIComponent(path)}" download title="Download file">⬇</a>
+            <span class="file-size">${formatSize(response.size)}</span>
+          </div>
         </div>
         <pre class="code-block" style="max-height:none;overflow-y:auto;border-radius:var(--radius-md);padding:1rem;font-size:0.8rem;line-height:1.6;"><code>${escapeHtml(response.content)}</code></pre>
       `;
@@ -472,7 +478,10 @@ async function openFile(path: string): Promise<void> {
       contentView.innerHTML = `
         <div class="file-header">
           <span class="file-path">${escapeHtml(path)}</span>
-          <span class="file-size">${formatSize(response.size)}</span>
+          <div class="file-header-actions">
+            <a class="file-download-btn" href="/api/fs/download?path=${encodeURIComponent(path)}" download title="Download file">⬇</a>
+            <span class="file-size">${formatSize(response.size)}</span>
+          </div>
         </div>
         <div class="empty-state" style="padding:3rem;text-align:center;color:var(--text-muted);">
           <p>Binary or unsupported file type</p>
