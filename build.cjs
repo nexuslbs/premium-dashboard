@@ -1,6 +1,7 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const DIST = path.resolve(__dirname, "dist");
 
@@ -33,28 +34,44 @@ if (result.errors.length > 0) {
   process.exit(1);
 }
 
-// Copy index.html and modify to use built assets
-let html = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
-
-// Replace module script with built script
-html = html.replace(
-  '<script type="module" src="/src/index.ts"></script>',
-  '<script type="module" src="/assets/index.js"></script>'
+// Compute content hashes for cache busting
+const jsContent = fs.readFileSync(path.join(DIST, "assets/index.js"), "utf-8");
+const jsHash = crypto.createHash("md5").update(jsContent).digest("hex").slice(0, 8);
+const jsFile = `index.${jsHash}.js`;
+fs.renameSync(
+  path.join(DIST, "assets/index.js"),
+  path.join(DIST, "assets", jsFile)
 );
 
-// Remove the Tailwind CSS import from style.css and replace with CDN link
-html = html.replace(
-  '<link rel="stylesheet" href="/src/style.css" />',
-  '<link href="https://cdn.jsdelivr.net/npm/tailwindcss@4.1.6/index.min.css" rel="stylesheet">\n  <link rel="stylesheet" href="/assets/style.css" />'
-);
-
-// Copy style.css as-is (no Tailwind import needed - using CDN)
+// Copy and hash CSS
 let css = fs.readFileSync(path.resolve(__dirname, "src/style.css"), "utf-8");
-// Remove the @import "tailwindcss" line since we're using CDN
 css = css.replace('@import "tailwindcss";\n', "");
 css = css.replace('@import "tailwindcss";', "");
-// Scope everything under .dashboard-layout to prevent CDN conflicts
 fs.writeFileSync(path.join(DIST, "assets/style.css"), css);
+
+const cssContent = fs.readFileSync(path.join(DIST, "assets/style.css"), "utf-8");
+const cssHash = crypto.createHash("md5").update(cssContent).digest("hex").slice(0, 8);
+const cssFile = `style.${cssHash}.css`;
+fs.renameSync(
+  path.join(DIST, "assets/style.css"),
+  path.join(DIST, "assets", cssFile)
+);
+
+// Copy index.html and inject hashed filenames
+let html = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
+
+html = html.replace(
+  '<script type="module" src="/src/index.ts"></script>',
+  `<script type="module" src="/assets/${jsFile}"></script>`
+);
+
+html = html.replace(
+  '<link rel="stylesheet" href="/src/style.css" />',
+  `<link href="https://cdn.jsdelivr.net/npm/tailwindcss@4.1.6/index.min.css" rel="stylesheet">\n  <link rel="stylesheet" href="/assets/${cssFile}" />`
+);
+
+// Write index.html
+fs.writeFileSync(path.join(DIST, "index.html"), html);
 
 // Copy favicon
 const faviconSrc = path.resolve(__dirname, "public/favicon.svg");
@@ -62,10 +79,7 @@ if (fs.existsSync(faviconSrc)) {
   fs.copyFileSync(faviconSrc, path.join(DIST, "favicon.svg"));
 }
 
-// Write index.html
-fs.writeFileSync(path.join(DIST, "index.html"), html);
-
 console.log("Build complete!");
 console.log(`  ${DIST}/index.html`);
-console.log(`  ${DIST}/assets/index.js`);
-console.log(`  ${DIST}/assets/style.css`);
+console.log(`  ${DIST}/assets/${jsFile}`);
+console.log(`  ${DIST}/assets/${cssFile}`);
