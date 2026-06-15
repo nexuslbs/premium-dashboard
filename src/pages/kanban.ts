@@ -254,11 +254,15 @@ async function loadBoard(): Promise<void> {
 
 async function moveTask(taskId: string, status: string): Promise<void> {
   try {
-    await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId), {
+    const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/status", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "Unknown error");
+      throw new Error(`${res.status}: ${text}`);
+    }
     loadBoard();
   } catch (e) {
     alert("Failed to move task: " + (e instanceof Error ? e.message : "Unknown error"));
@@ -267,6 +271,7 @@ async function moveTask(taskId: string, status: string): Promise<void> {
 
 function renderColumn(id: string, title: string, tasks: KanbanTask[]): string {
   const colorClass =
+    id === "backlog" ? "kanban-col-neutral" :
     id === "todo" ? "kanban-col-purple" :
     id === "in_progress" ? "kanban-col-cyan" :
     id === "done" ? "kanban-col-emerald" :
@@ -315,7 +320,7 @@ function renderTaskCard(task: KanbanTask): string {
         <div style="position:relative;">
           <button class="kanban-move-toggle" data-task-id="${task.id}" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:4px;padding:0.15rem 0.4rem;cursor:pointer;font-size:0.65rem;white-space:nowrap;">↳ Move</button>
           <div class="kanban-move-dropdown" data-task-id="${task.id}" style="display:none;position:absolute;top:100%;left:0;z-index:10;background:#1a1a2e;border:1px solid var(--glass-border);border-radius:6px;padding:0.25rem;min-width:110px;box-shadow:0 4px 12px rgba(0,0,0,0.4);">
-            ${["todo","in_progress","done","blocked"].filter(s => s !== status).map(s =>
+            ${["backlog","todo","in_progress","done","blocked"].filter(s => s !== status).map(s => 
               `<button class="kanban-move-btn" data-move-to="${s}" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text-primary);padding:0.3rem 0.5rem;cursor:pointer;font-size:0.7rem;border-radius:4px;">→ ${s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}</button>`
             ).join("")}
           </div>
@@ -615,6 +620,7 @@ async function loadTaskDetail(taskId: string): Promise<void> {
 
 function statusBadge(status: string): string {
   switch (status) {
+    case "backlog": return "badge-neutral";
     case "done": return "badge-success";
     case "in_progress": return "badge-warning";
     case "blocked": return "badge-error";

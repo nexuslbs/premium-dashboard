@@ -89,20 +89,20 @@ kanbanRouter.get("/board", (_req, res) => {
     `);
 
     // Group into columns
-    const statusOrder = ["todo", "in_progress", "done", "blocked"];
+    const statusOrder = ["backlog", "todo", "in_progress", "done", "blocked"];
     const columns = statusOrder.map((s) => ({
       id: s,
-      title: s === "todo" ? "Todo" : s === "in_progress" ? "In Progress" : s === "done" ? "Done" : "Blocked",
+      title: s === "todo" ? "Todo" : s === "in_progress" ? "In Progress" : s === "done" ? "Done" : s === "blocked" ? "Blocked" : "Backlog",
       tasks: tasks.filter((t: any) => t.status === s),
     }));
 
-    // Catch any tasks with unknown status
+    // Also catch any tasks with truly unknown status (shouldn't happen)
     const known = new Set(statusOrder);
     const ungrouped = tasks.filter((t: any) => !known.has(t.status));
     if (ungrouped.length > 0) {
       columns.unshift({
-        id: "backlog",
-        title: "Backlog",
+        id: "unknown",
+        title: "Unknown",
         tasks: ungrouped,
       });
     }
@@ -223,7 +223,7 @@ kanbanRouter.patch("/tasks/:id/status", (req, res) => {
     const taskId = rawId;
 
     const { status } = req.body;
-    const validStatuses = ["todo", "in_progress", "done", "blocked"];
+    const validStatuses = ["backlog", "todo", "in_progress", "done", "blocked"];
     if (!validStatuses.includes(status)) {
       res.status(400).json({ error: `Status must be one of: ${validStatuses.join(", ")}` });
       return;
