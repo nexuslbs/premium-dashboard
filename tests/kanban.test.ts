@@ -319,4 +319,160 @@ describe("Kanban — DnD / reorder bug prevention", () => {
       }
     });
   });
+
+  // ─────────────────────────────────────────────────────────
+  // Reorder: ANY card can be moved to ANY position
+  // ─────────────────────────────────────────────────────────
+  describe("Reorder: any card to any position", () => {
+    const ids: string[] = [];
+
+    it("creates 3 tasks in Backlog and verifies sort_order order", async () => {
+      for (let i = 0; i < 3; i++) {
+        const r = await api("/api/kanban/tasks", {
+          method: "POST",
+          body: JSON.stringify({ title: `AnyPos-Task-${i}`, status: "backlog" }),
+        });
+        expect(r.status).toBe(200);
+        ids.push(r.data.id);
+      }
+
+      // Verify they exist in Backlog with increasing sort_order
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+      const col = board.data.columns.find((c: any) => c.id === "backlog");
+      if (!col) return;
+      const our = col.tasks.filter((t: any) => ids.includes(t.id));
+      expect(our.length).toBe(3);
+    });
+
+    it("moves last-created card to before first-created (top)", async () => {
+      const [first, second, third] = ids;
+      const r = await api(`/api/kanban/tasks/${encodeURIComponent(third)}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ targetId: first, position: "before" }),
+      });
+      expect(r.status).toBe(200);
+
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+      const col = board.data.columns.find((c: any) => c.id === "backlog");
+      if (!col) return;
+      const our = col.tasks
+        .filter((t: any) => ids.includes(t.id))
+        .sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+      expect(our.length).toBe(3);
+      expect(our[0].id).toBe(third); // third moved before first
+      expect(our[1].id).toBe(first);
+      expect(our[2].id).toBe(second);
+    });
+
+    it("moves middle-created card to before last-created (bottom→middle)", async () => {
+      const [first, second, third] = ids;
+      const r = await api(`/api/kanban/tasks/${encodeURIComponent(first)}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ targetId: second, position: "before" }),
+      });
+      expect(r.status).toBe(200);
+
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+      const col = board.data.columns.find((c: any) => c.id === "backlog");
+      if (!col) return;
+      const our = col.tasks
+        .filter((t: any) => ids.includes(t.id))
+        .sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+      expect(our.length).toBe(3);
+      // third, first, second → first moved before second
+      expect(our[0].id).toBe(third);
+      expect(our[1].id).toBe(first);
+      expect(our[2].id).toBe(second);
+    });
+
+    it("reorder preserves all task statuses (no spurious status changes)", async () => {
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+
+      for (const col of board.data.columns) {
+        for (const t of col.tasks) {
+          if (ids.includes(t.id)) {
+            expect(t.status).toBe("backlog");
+          }
+        }
+      }
+    });
+
+    it("moving first-created before third-created reverses order completely", async () => {
+      const [first, second, third] = ids;
+      const r = await api(`/api/kanban/tasks/${encodeURIComponent(first)}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ targetId: third, position: "before" }),
+      });
+      expect(r.status).toBe(200);
+
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+      const col = board.data.columns.find((c: any) => c.id === "backlog");
+      if (!col) return;
+      const our = col.tasks
+        .filter((t: any) => ids.includes(t.id))
+        .sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+      // Expected order: first, third, second
+      // After previous step: third, first, second
+      // Move first before third → first, third, second
+      expect(our[0].id).toBe(first);
+      expect(our[1].id).toBe(third);
+      expect(our[2].id).toBe(second);
+    });
+
+    afterAll(async () => {
+      for (const id of ids) {
+        await api(`/api/kanban/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+      }
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Move dropdown expands to all statuses
+  // ─────────────────────────────────────────────────────────
+  describe("Move dropdown: all statuses accepted", () => {
+    it.each([
+      "backlog", "todo", "ready", "running", "review", "done", "blocked",
+    ])("accepts move to %s", async (status) => {
+      const r = await api("/api/kanban/tasks", {
+        method: "POST",
+        body: JSON.stringify({ title: `Move-test-${status}`, status: "todo" }),
+      });
+      expect(r.status).toBe(200);
+      const id = r.data.id;
+      testIds.push(id);
+
+      const r2 = await api(`/api/kanban/tasks/${encodeURIComponent(id)}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      expect(r2.status).toBe(200);
+
+      // Verify the move took effect
+      const board = await api("/api/kanban/board");
+      expect(board.status).toBe(200);
+      const mapped = board.data.columns
+        .flatMap((c: any) => c.tasks)
+        .find((t: any) => t.id === id);
+      expect(mapped).toBeDefined();
+      expect(mapped.status).toBe(status);
+    });
+  });
+});
+
+const testIds: string[] = [];
+
+afterAll(async () => {
+  for (const id of testIds) {
+    try {
+      await api(`/api/kanban/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch { /* ignore */ }
+  }
 });

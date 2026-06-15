@@ -110,7 +110,7 @@ const COLUMN_ORDER = [
 ];
 
 // ── Statuses users can move tasks to via the Move dropdown ──
-const MOVEABLE_STATUSES = ["backlog", "todo", "ready", "running", "done", "blocked"];
+const MOVEABLE_STATUSES = ["backlog", "todo", "ready", "running", "review", "done", "blocked"];
 const MOVEABLE_STATUS_SET = new Set(MOVEABLE_STATUSES);
 
 // ── GET /api/kanban/board — Tasks grouped by status ──

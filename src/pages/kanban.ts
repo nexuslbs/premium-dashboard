@@ -227,31 +227,55 @@ async function loadBoard(): Promise<void> {
         // Intra-column reorder: drop on another card in same column
         if (sourceCol === newStatus) {
           const targetCard = (e.target as HTMLElement).closest(".kanban-card");
+          let targetId: string | null = null;
           if (targetCard) {
-            const targetId = targetCard.getAttribute("data-task-id");
-            if (targetId && targetId !== taskId) {
-              try {
-                const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/reorder", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ targetId, position: "before" }),
-                });
-                if (!res.ok) {
-                  const text = await res.text().catch(() => "Unknown error");
-                  console.error("Reorder failed:", `${res.status}: ${text}`);
+            targetId = targetCard.getAttribute("data-task-id");
+          } else {
+            // No card directly under cursor — find the nearest card by Y position
+            const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
+            if (colBody) {
+              const cards = colBody.querySelectorAll<HTMLElement>(".kanban-card");
+              const dropY = (e as DragEvent).clientY;
+              let closestCard: HTMLElement | null = null;
+              let closestDist = Infinity;
+              for (const card of cards) {
+                const rect = card.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                const dist = Math.abs(dropY - midY);
+                if (dist < closestDist) {
+                  closestDist = dist;
+                  closestCard = card;
                 }
-                loadBoard();
-              } catch (err) {
-                console.error("Reorder failed:", err);
-                loadBoard(); // reload anyway to show current state
               }
-              return; // ← CRITICAL: always return when sourceCol === newStatus to prevent fallthrough to status endpoint
+              if (closestCard) {
+                const nearestId = closestCard.getAttribute("data-task-id");
+                if (nearestId && nearestId !== taskId) {
+                  targetId = nearestId;
+                }
+              }
             }
           }
-          // Dropped within same column but no card target (between cards / empty area)
-          // Don't call status endpoint — just reload to show current order
-          loadBoard();
-          return; // ← CRITICAL: always return when sourceCol === newStatus
+          if (targetId && targetId !== taskId) {
+            try {
+              const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId) + "/reorder", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ targetId, position: "before" }),
+              });
+              if (!res.ok) {
+                const text = await res.text().catch(() => "Unknown error");
+                console.error("Reorder failed:", `${res.status}: ${text}`);
+              }
+              loadBoard();
+            } catch (err) {
+              console.error("Reorder failed:", err);
+              loadBoard(); // reload anyway to show current state
+            }
+          } else {
+            // No suitable target found — just reload
+            loadBoard();
+          }
+          return; // ← CRITICAL: always return when sourceCol === newStatus to prevent fallthrough to status endpoint
         }
 
         // Cross-column move
@@ -330,10 +354,11 @@ function renderTaskCard(task: KanbanTask): string {
   const timeAgo = formatRelativeTime(task.created_at);
 
   const status = task.status || "todo";
-  const moveableStatuses = ["backlog","todo","ready","running","done","blocked"];
+  const moveableStatuses = ["backlog","todo","ready","running","review","done","blocked"];
   const statusLabels: Record<string, string> = {
     backlog: "Backlog", todo: "Todo", ready: "Ready",
-    running: "Running", done: "Done", blocked: "Blocked",
+    running: "In Progress", review: "Review",
+    done: "Done", blocked: "Blocked",
   };
 
   return `
