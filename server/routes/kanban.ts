@@ -124,7 +124,7 @@ kanbanRouter.get("/board", (_req, res) => {
              sort_order
       FROM tasks
       WHERE status != 'archived'
-      ORDER BY priority DESC, sort_order ASC, created_at DESC
+      ORDER BY sort_order ASC, priority DESC, created_at DESC
     `);
 
     // Group tasks by their display column using the STATUS_MAP
