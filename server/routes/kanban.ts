@@ -5,7 +5,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { randomBytes } from "crypto";
 
-const KANBAN_DB = "/opt/data/kanban.db";
+const KANBAN_DB = "/data/kanban.db";
 
 function shellQuote(s: string): string {
   const escaped = s.replace(/["\\$\\`]/g, "\\$&");
