@@ -128,11 +128,16 @@ let lastOpenedFile: string | null = null;
 
 export function renderSearch(container: HTMLElement): void {
   container.innerHTML = `
-    <div class="search-page">
-      <div class="explorer-panel">
+    <div class="search-page" id="search-page">
+      <div class="explorer-panel" id="explorer-panel">
         <div class="explorer-header">
           <span class="explorer-title">📂 Filesystem</span>
-          <button class="explorer-refresh" id="explorer-refresh" title="Refresh file tree">🔄</button>
+          <div class="explorer-header-actions">
+            <button class="explorer-toggle" id="explorer-toggle" title="Collapse explorer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="explorer-refresh" id="explorer-refresh" title="Refresh file tree">🔄</button>
+          </div>
         </div>
         <div class="explorer-tree" id="explorer-tree">
           <div class="loading">Loading</div>
@@ -163,6 +168,26 @@ export function renderSearch(container: HTMLElement): void {
     params.delete("file");
     const newUrl = location.pathname + (params.toString() ? "?" + params.toString() : "");
     history.replaceState({}, "", newUrl);
+  });
+
+  // Explorer collapse/expand toggle
+  const explorerPanel = document.getElementById("explorer-panel")!;
+  const searchPage = document.getElementById("search-page")!;
+  const explorerToggle = document.getElementById("explorer-toggle")! as HTMLButtonElement;
+
+  // Restore saved state
+  const explorerCollapsed = localStorage.getItem("explorer-collapsed") === "true";
+  if (explorerCollapsed) {
+    explorerPanel.classList.add("collapsed");
+    searchPage.classList.add("explorer-collapsed");
+    explorerToggle.title = "Expand explorer";
+  }
+
+  explorerToggle.addEventListener("click", () => {
+    const isCollapsed = explorerPanel.classList.toggle("collapsed");
+    searchPage.classList.toggle("explorer-collapsed", isCollapsed);
+    explorerToggle.title = isCollapsed ? "Expand explorer" : "Collapse explorer";
+    localStorage.setItem("explorer-collapsed", String(isCollapsed));
   });
 
   // Search input

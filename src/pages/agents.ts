@@ -459,6 +459,7 @@ function renderEventRow(ev: AgentEventItem): string {
   return `
     <div class="event-row">
       <div class="event-row-header">
+        <span class="ev-id-badge" title="Row ID in agent-interactions.db">#${ev.id}</span>
         <span class="agent-badge" style="--agent-color:${roleColor};background:${roleColor}22;border-color:${roleColor}44;color:${roleColor}">
           ${escapeHtml(role)}
         </span>

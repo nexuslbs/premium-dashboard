@@ -77,3 +77,31 @@ router.go(initialRoute);
 // Check API connection
 checkConnection();
 setInterval(checkConnection, 30000);
+
+// ── Sidebar toggle ──
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const sidebarToggleBar = document.getElementById("sidebar-toggle-bar");
+const sidebar = document.querySelector(".sidebar");
+const layout = document.querySelector(".dashboard-layout");
+
+function toggleSidebar(): void {
+  const isCollapsed = sidebar!.classList.toggle("collapsed");
+  layout!.classList.toggle("sidebar-collapsed", isCollapsed);
+  sidebarToggle!.title = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+  if (sidebarToggleBar) sidebarToggleBar.title = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+  localStorage.setItem("sidebar-collapsed", String(isCollapsed));
+}
+
+if (sidebarToggle && sidebar && layout) {
+  // Restore saved state
+  const collapsed = localStorage.getItem("sidebar-collapsed") === "true";
+  if (collapsed) {
+    sidebar.classList.add("collapsed");
+    layout.classList.add("sidebar-collapsed");
+    sidebarToggle.title = "Expand sidebar";
+    if (sidebarToggleBar) sidebarToggleBar.title = "Expand sidebar";
+  }
+
+  sidebarToggle.addEventListener("click", toggleSidebar);
+  if (sidebarToggleBar) sidebarToggleBar.addEventListener("click", toggleSidebar);
+}
