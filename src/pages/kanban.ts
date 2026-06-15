@@ -39,6 +39,16 @@ export function renderKanban(container: HTMLElement): void {
             </select>
           </div>
           <div>
+            <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Board</label>
+            <select id="task-create-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+              <option value="backlog">Backlog</option>
+              <option value="todo">Todo</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+          <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Assignee</label>
             <input type="text" id="task-create-assignee" placeholder="Optional" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;" />
           </div>
@@ -80,9 +90,10 @@ export function renderKanban(container: HTMLElement): void {
     const assignee = (document.getElementById("task-create-assignee") as HTMLInputElement)?.value.trim() || undefined;
     const skills = (document.getElementById("task-create-skills") as HTMLInputElement)?.value.trim() || undefined;
     const model_override = (document.getElementById("task-create-model") as HTMLInputElement)?.value.trim() || undefined;
+    const status = (document.getElementById("task-create-status") as HTMLSelectElement)?.value || "backlog";
 
     try {
-      await apiPost("/kanban/tasks", { title, body, priority, assignee, skills, model_override });
+      await apiPost("/kanban/tasks", { title, body, priority, assignee, skills, model_override, status });
       closeCreateModal();
       loadBoard();
     } catch (e) {
@@ -375,6 +386,7 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Status</label>
             <select id="task-edit-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+              <option value="backlog">Backlog</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
               <option value="done">Done</option>
@@ -592,17 +604,21 @@ async function loadTaskDetail(taskId: string): Promise<void> {
       if (!title) return;
       const body = (document.getElementById("task-edit-body") as HTMLTextAreaElement)?.value.trim() || undefined;
       const priority = parseInt((document.getElementById("task-edit-priority") as HTMLSelectElement)?.value || "0");
-      const status = (document.getElementById("task-edit-status") as HTMLSelectElement)?.value || "todo";
+      const status = (document.getElementById("task-edit-status") as HTMLSelectElement)?.value || "backlog";
       const assignee = (document.getElementById("task-edit-assignee") as HTMLInputElement)?.value.trim() || undefined;
       const skills = (document.getElementById("task-edit-skills") as HTMLInputElement)?.value.trim() || undefined;
       const model_override = (document.getElementById("task-edit-model") as HTMLInputElement)?.value.trim() || undefined;
 
       try {
-        await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId), {
+        const res = await fetch("/api/kanban/tasks/" + encodeURIComponent(taskId), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, body, priority, status, assignee, skills, model_override }),
         });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "Unknown error");
+          throw new Error(`${res.status}: ${text}`);
+        }
         const modal = document.getElementById("edit-task-modal");
         if (modal) modal.style.display = "none";
         // Reload the detail view

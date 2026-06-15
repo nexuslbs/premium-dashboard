@@ -180,7 +180,7 @@ kanbanRouter.post("/tasks", (req, res) => {
 
     const id = "t_" + randomBytes(4).toString("hex");
     const now = Math.floor(Date.now() / 1000);
-    const taskStatus = status || "todo";
+    const taskStatus = status || "backlog";
     const taskPriority = priority != null ? priority : 0;
 
     // Get next sort_order for this status
@@ -324,7 +324,7 @@ kanbanRouter.patch("/tasks/:id", (req, res) => {
       return;
     }
 
-    const { title, body, assignee, priority, skills, model_override } = req.body;
+    const { title, body, assignee, priority, skills, model_override, status } = req.body;
     const setClauses: string[] = [];
 
     if (title !== undefined) {
@@ -348,6 +348,14 @@ kanbanRouter.patch("/tasks/:id", (req, res) => {
     }
     if (model_override !== undefined) {
       setClauses.push(`model_override = ${sqlQuote(model_override)}`);
+    }
+    if (status !== undefined) {
+      const validStatuses = ["backlog", "todo", "in_progress", "done", "blocked"];
+      if (!validStatuses.includes(status)) {
+        res.status(400).json({ error: `Status must be one of: ${validStatuses.join(", ")}` });
+        return;
+      }
+      setClauses.push(`status = ${sqlQuote(status)}`);
     }
 
     if (setClauses.length === 0) {
