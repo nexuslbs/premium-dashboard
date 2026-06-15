@@ -1310,10 +1310,79 @@ tr:hover td {
   opacity: 1;
 }
 
-/* Kanban modal select styling — dark theme for dropdown options */
-.kanban-modal-select option {
+/* Custom dropdown — replaces native <select> to avoid OS white popup shell */
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+  transition: background 0.1s;
+}
+
+.select-trigger:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.select-arrow {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+  margin-left: 0.5rem;
+}
+
+.custom-select.open .select-arrow {
+  transform: rotate(180deg);
+}
+
+.select-options {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
   background: #1a1a2e;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  z-index: 1001;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.custom-select.open .select-options {
+  display: block;
+}
+
+.select-option {
+  padding: 0.5rem;
+  cursor: pointer;
   color: #e0e0e0;
+  font-size: 0.85rem;
+  transition: background 0.1s;
+}
+
+.select-option:hover {
+  background: rgba(139,92,246,0.15);
+  color: #fff;
+}
+
+.select-option.selected {
+  background: rgba(139,92,246,0.1);
+  color: var(--accent-purple, #a78bfa);
 }
 
 /* Markdown rendered content */

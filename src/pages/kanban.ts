@@ -32,7 +32,7 @@ export function renderKanban(container: HTMLElement): void {
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Priority</label>
-            <select id="task-create-priority" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-create-priority" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="0">Low</option>
               <option value="1">Med</option>
               <option value="3">High</option>
@@ -41,7 +41,7 @@ export function renderKanban(container: HTMLElement): void {
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Board</label>
-            <select id="task-create-status" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-create-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="backlog">Backlog</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
@@ -102,6 +102,9 @@ export function renderKanban(container: HTMLElement): void {
     }
   });
 
+  enhanceSelect("task-create-priority");
+  enhanceSelect("task-create-status");
+
   loadBoard();
 }
 
@@ -114,6 +117,8 @@ function closeCreateModal(): void {
   if (body) body.value = "";
   const priority = document.getElementById("task-create-priority") as HTMLSelectElement;
   if (priority) priority.value = "0";
+  syncSelectDisplay("task-create-priority");
+  syncSelectDisplay("task-create-status");
   const assignee = document.getElementById("task-create-assignee") as HTMLInputElement;
   if (assignee) assignee.value = "";
   const skills = document.getElementById("task-create-skills") as HTMLInputElement;
@@ -420,7 +425,7 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Priority</label>
-            <select id="task-edit-priority" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-edit-priority" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="0">Low</option>
               <option value="1">Med</option>
               <option value="3">High</option>
@@ -429,7 +434,7 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Status</label>
-            <select id="task-edit-status" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-edit-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="backlog">Backlog</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
@@ -468,6 +473,9 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
   }
 
   loadTaskDetail(taskId);
+
+  enhanceSelect("task-edit-priority");
+  enhanceSelect("task-edit-status");
 }
 
 async function loadTaskDetail(taskId: string): Promise<void> {
@@ -644,6 +652,8 @@ async function loadTaskDetail(taskId: string): Promise<void> {
         (document.getElementById("task-edit-body") as HTMLTextAreaElement).value = task.body || "";
         (document.getElementById("task-edit-priority") as HTMLSelectElement).value = String(task.priority);
         (document.getElementById("task-edit-status") as HTMLSelectElement).value = task.status;
+        syncSelectDisplay("task-edit-priority");
+        syncSelectDisplay("task-edit-status");
         (document.getElementById("task-edit-assignee") as HTMLInputElement).value = task.assignee || "";
         (document.getElementById("task-edit-skills") as HTMLInputElement).value = task.skills || "";
         (document.getElementById("task-edit-model") as HTMLInputElement).value = task.model_override || "";
@@ -736,6 +746,80 @@ function escapeHtml(text: string): string {
 }
 
 // ── Attachments ──
+
+// ── Custom dropdown (replaces native <select> for full theme control) ──
+
+function enhanceSelect(selectId: string): void {
+  const select = document.getElementById(selectId) as HTMLSelectElement;
+  if (!select || (select as any).dataset._enhanced) return;
+  (select as any).dataset._enhanced = "1";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "custom-select";
+
+  function buildOptions(): void {
+    const selected = Array.from(select.options).find((o) => o.selected) || select.options[0];
+    wrapper.innerHTML = `
+      <div class="select-trigger">
+        <span class="select-trigger-text">${selected ? escapeHtml(selected.label) : ""}</span>
+        <span class="select-arrow">▾</span>
+      </div>
+      <div class="select-options">
+        ${Array.from(select.options)
+          .map(
+            (o) =>
+              `<div class="select-option${o.selected ? " selected" : ""}" data-value="${o.value}">${escapeHtml(o.label)}</div>`
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  buildOptions();
+
+  select.style.display = "none";
+  select.parentNode?.insertBefore(wrapper, select.nextSibling);
+
+  const trigger = wrapper.querySelector(".select-trigger") as HTMLElement;
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = wrapper.classList.contains("open");
+    document.querySelectorAll(".custom-select.open").forEach((c) => c.classList.remove("open"));
+    if (!isOpen) wrapper.classList.add("open");
+  });
+
+  wrapper.querySelector(".select-options")!.addEventListener("click", (e) => {
+    const opt = (e.target as HTMLElement).closest(".select-option") as HTMLElement;
+    if (!opt) return;
+    const value = opt.getAttribute("data-value");
+    if (value) {
+      select.value = value;
+      const textEl = wrapper.querySelector(".select-trigger-text") as HTMLElement;
+      if (textEl) textEl.textContent = opt.textContent;
+      wrapper.querySelectorAll(".select-option").forEach((o) => o.classList.remove("selected"));
+      opt.classList.add("selected");
+    }
+    wrapper.classList.remove("open");
+  });
+
+  document.addEventListener("click", () => wrapper.classList.remove("open"));
+}
+
+function syncSelectDisplay(selectId: string): void {
+  const select = document.getElementById(selectId) as HTMLSelectElement;
+  if (!select) return;
+  const wrapper = select.nextElementSibling as HTMLElement;
+  if (!wrapper || !wrapper.classList.contains("custom-select")) return;
+
+  const selected = Array.from(select.options).find((o) => o.selected) || select.options[0];
+  const textEl = wrapper.querySelector(".select-trigger-text") as HTMLElement;
+  if (textEl) textEl.textContent = selected ? selected.label : "";
+
+  wrapper.querySelectorAll(".select-option").forEach((o) => {
+    o.classList.toggle("selected", o.getAttribute("data-value") === select.value);
+  });
+}
 
 let _currentAttachmentTaskId: string | null = null;
 
