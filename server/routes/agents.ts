@@ -102,6 +102,9 @@ agentsRouter.get("/events", (req, res) => {
     // Build WHERE clauses
     const conditions: string[] = [];
 
+    // Origin filter param
+    const originParam = (req.query.origin as string) || "all";
+
     // Agent filter
     const agentValues: string[] = Array.isArray(agentParam)
       ? (agentParam as string[])
@@ -127,6 +130,11 @@ agentsRouter.get("/events", (req, res) => {
     if (typeValues.length > 0) {
       const quoted = typeValues.map((t) => sq(t));
       conditions.push(`ai.type IN (${quoted.join(",")})`);
+    }
+
+    // Origin filter
+    if (originParam !== "all") {
+      conditions.push(`ai.origin = ${sq(originParam)}`);
     }
 
     // Subtype filter (LIKE search)
@@ -166,6 +174,7 @@ agentsRouter.get("/events", (req, res) => {
           WHEN ai.from_entity = 'user' THEN 'user'
           ELSE COALESCE(arm.role, 'hermes')
         END as agent_role,
+        ai.origin,
         ai.type,
         ai.subtype,
         ai.from_entity,

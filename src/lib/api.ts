@@ -136,6 +136,7 @@ export interface AgentEventItem {
   timestamp: string;
   session_id: string;
   agent_role: string;
+  origin: string;
   type: string;
   subtype: string | null;
   from_entity: string;
@@ -166,6 +167,80 @@ export interface AgentFilters {
   agents: FilterOption[];
   providers: string[];
   models: string[];
+}
+
+// ── Kanban Types ──
+
+export interface KanbanTask {
+  id: string;
+  title: string;
+  body: string | null;
+  assignee: string | null;
+  status: string;
+  priority: number;
+  created_by: string | null;
+  created_at: number;
+  started_at: number | null;
+  completed_at: number | null;
+  session_id: string | null;
+  current_run_id: number | null;
+  last_failure_error: string | null;
+  max_runtime_seconds: number | null;
+  consecutive_failures: number;
+  skills: string | null;
+  model_override: string | null;
+}
+
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  tasks: KanbanTask[];
+}
+
+export interface KanbanBoard {
+  columns: KanbanColumn[];
+  total: number;
+}
+
+export interface KanbanTaskDetail extends KanbanTask {
+  comments: KanbanComment[];
+  events: KanbanEvent[];
+  runs: KanbanRun[];
+  links: KanbanLink[];
+}
+
+export interface KanbanComment {
+  id: number;
+  task_id: string;
+  author: string;
+  body: string;
+  created_at: number;
+}
+
+export interface KanbanEvent {
+  id: number;
+  task_id: string;
+  run_id: number | null;
+  kind: string;
+  payload: string | null;
+  created_at: number;
+}
+
+export interface KanbanRun {
+  id: number;
+  task_id: string;
+  profile: string | null;
+  status: string;
+  started_at: number;
+  ended_at: number | null;
+  outcome: string | null;
+  summary: string | null;
+  error: string | null;
+}
+
+export interface KanbanLink {
+  parent_id: string;
+  child_id: string;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
