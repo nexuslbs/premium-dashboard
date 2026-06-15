@@ -2063,36 +2063,6 @@ tr:hover td {
   color: var(--text-muted);
 }
 
-/* Filter actions row (Refresh / Reset buttons) */
-.filter-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.375rem;
-  padding-bottom: 0.125rem;
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  line-height: 1;
-}
-.btn-secondary:hover {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.3);
-  color: var(--accent-purple);
-}
-
 /* Agent filter buttons */
 .agent-filter-group {
   display: flex;

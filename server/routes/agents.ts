@@ -105,9 +105,6 @@ agentsRouter.get("/events", (req, res) => {
     // Origin filter param
     const originParam = (req.query.origin as string) || "all";
 
-    // Message_id filter param
-    const messageIdParam = (req.query.message_id as string) || "all";
-
     // Agent filter
     const agentValues: string[] = Array.isArray(agentParam)
       ? (agentParam as string[])
@@ -138,13 +135,6 @@ agentsRouter.get("/events", (req, res) => {
     // Origin filter
     if (originParam !== "all") {
       conditions.push(`ai.origin = ${sq(originParam)}`);
-    }
-
-    // Message_id filter
-    if (messageIdParam === "null") {
-      conditions.push("ai.message_id IS NULL");
-    } else if (messageIdParam === "non-null") {
-      conditions.push("ai.message_id IS NOT NULL");
     }
 
     // Subtype filter (LIKE search)
@@ -196,7 +186,7 @@ agentsRouter.get("/events", (req, res) => {
       FROM agent_interactions ai
       LEFT JOIN agent_role_map arm ON ai.session_id = arm.session_id
       ${whereClause}
-      ORDER BY ai.timestamp DESC, ai.id DESC
+      ORDER BY ai.id DESC
       LIMIT ${parseInt(String(limit), 10)}
       OFFSET ${parseInt(String(offset), 10)}
     `);
