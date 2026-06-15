@@ -3,7 +3,7 @@ import { apiGet, apiDelete, type TaskAttachment } from "./api";
 const API = "/api";
 
 export async function getAttachments(taskId: string): Promise<TaskAttachment[]> {
-  return apiGet<TaskAttachment[]>(`${API}/tasks/${taskId}/attachments`);
+  return apiGet<TaskAttachment[]>(`/tasks/${taskId}/attachments`);
 }
 
 export async function uploadAttachments(
@@ -29,7 +29,7 @@ export async function uploadAttachments(
 }
 
 export async function deleteAttachment(id: number): Promise<void> {
-  await apiDelete(`${API}/attachments/${id}`);
+  await apiDelete(`/attachments/${id}`);
 }
 
 export function getDownloadUrl(id: number): string {

@@ -61,6 +61,14 @@ export function renderKanban(container: HTMLElement): void {
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Model Override</label>
             <input type="text" id="task-create-model" placeholder="Optional" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;" />
           </div>
+          <div>
+            <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Files</label>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="file" id="task-create-files" multiple style="display:none;" />
+              <button type="button" id="task-create-files-btn" style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:6px;padding:0.5rem;cursor:pointer;font-size:0.85rem;flex:1;text-align:left;">Attach files</button>
+              <span id="task-create-files-count" style="display:none;align-self:center;font-size:0.8rem;color:var(--text-muted);white-space:nowrap;"></span>
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
           <button id="task-create-cancel" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:6px;padding:0.375rem 0.75rem;cursor:pointer;font-size:0.8rem;">Cancel</button>
@@ -74,6 +82,19 @@ export function renderKanban(container: HTMLElement): void {
   document.getElementById("create-task-btn")?.addEventListener("click", () => {
     const modal = document.getElementById("create-task-modal");
     if (modal) modal.style.display = "flex";
+  });
+
+  // Wire up file picker for create modal
+  document.getElementById("task-create-files-btn")?.addEventListener("click", () => {
+    document.getElementById("task-create-files")?.click();
+  });
+  document.getElementById("task-create-files")?.addEventListener("change", () => {
+    const input = document.getElementById("task-create-files") as HTMLInputElement;
+    const count = document.getElementById("task-create-files-count");
+    if (count && input?.files?.length) {
+      count.style.display = "";
+      count.textContent = `${input.files.length} file(s) selected`;
+    }
   });
 
   document.getElementById("task-create-cancel")?.addEventListener("click", () => {
@@ -94,7 +115,16 @@ export function renderKanban(container: HTMLElement): void {
     const status = (document.getElementById("task-create-status") as HTMLSelectElement)?.value || "backlog";
 
     try {
-      await apiPost("/kanban/tasks", { title, body, priority, assignee, skills, model_override, status });
+      const task = await apiPost<any>("/kanban/tasks", { title, body, priority, assignee, skills, model_override, status });
+      // Upload files if any
+      const fileInput = document.getElementById("task-create-files") as HTMLInputElement;
+      if (fileInput?.files?.length) {
+        try {
+          await uploadAttachments(task.id, fileInput.files);
+        } catch (uploadErr) {
+          console.error("[kanban] File upload after create failed:", uploadErr);
+        }
+      }
       closeCreateModal();
       loadBoard();
     } catch (e) {
@@ -125,6 +155,10 @@ function closeCreateModal(): void {
   if (skills) skills.value = "";
   const model = document.getElementById("task-create-model") as HTMLInputElement;
   if (model) model.value = "";
+  const files = document.getElementById("task-create-files") as HTMLInputElement;
+  if (files) files.value = "";
+  const count = document.getElementById("task-create-files-count");
+  if (count) count.style.display = "none";
 }
 
 async function loadBoard(): Promise<void> {
@@ -454,6 +488,14 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Model Override</label>
             <input type="text" id="task-edit-model" placeholder="Optional" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;" />
           </div>
+          <div>
+            <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Files</label>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="file" id="task-edit-files" multiple style="display:none;" />
+              <button type="button" id="task-edit-files-btn" style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:6px;padding:0.5rem;cursor:pointer;font-size:0.85rem;flex:1;text-align:left;">Attach files</button>
+              <span id="task-edit-files-count" style="display:none;align-self:center;font-size:0.8rem;color:var(--text-muted);white-space:nowrap;"></span>
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
           <button id="task-edit-cancel" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:6px;padding:0.375rem 0.75rem;cursor:pointer;font-size:0.8rem;">Cancel</button>
@@ -473,6 +515,19 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
   }
 
   loadTaskDetail(taskId);
+
+  // Wire up file picker for edit modal
+  document.getElementById("task-edit-files-btn")?.addEventListener("click", () => {
+    document.getElementById("task-edit-files")?.click();
+  });
+  document.getElementById("task-edit-files")?.addEventListener("change", () => {
+    const input = document.getElementById("task-edit-files") as HTMLInputElement;
+    const count = document.getElementById("task-edit-files-count");
+    if (count && input?.files?.length) {
+      count.style.display = "";
+      count.textContent = `${input.files.length} file(s) selected`;
+    }
+  });
 
   enhanceSelect("task-edit-priority");
   enhanceSelect("task-edit-status");
@@ -690,6 +745,15 @@ async function loadTaskDetail(taskId: string): Promise<void> {
         if (!res.ok) {
           const text = await res.text().catch(() => "Unknown error");
           throw new Error(`${res.status}: ${text}`);
+        }
+        // Upload files if any
+        const fileInput = document.getElementById("task-edit-files") as HTMLInputElement;
+        if (fileInput?.files?.length) {
+          try {
+            await uploadAttachments(taskId, fileInput.files);
+          } catch (uploadErr) {
+            console.error("[kanban] File upload after edit failed:", uploadErr);
+          }
         }
         const modal = document.getElementById("edit-task-modal");
         if (modal) modal.style.display = "none";

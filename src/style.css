@@ -1198,7 +1198,6 @@ tr:hover td {
 /* ── Attachments Section ── */
 
 .attachments-section {
-  border-top: 1px solid var(--border-primary);
   padding-top: 0;
 }
 
