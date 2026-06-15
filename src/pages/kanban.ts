@@ -1,10 +1,6 @@
 import { apiGet, apiPost, type KanbanBoard, type KanbanTask, type KanbanTaskDetail } from "../lib/api";
 import { router } from "../lib/router";
 
-// ── Drag-and-drop state (module-level, survives loadBoard re-renders) ──
-let _dragTaskId: string | null = null;
-let _dragSourceCol: string | null = null;
-
 export function renderKanban(container: HTMLElement): void {
   container.innerHTML = `
     <div class="page-header">
@@ -205,8 +201,6 @@ async function loadBoard(): Promise<void> {
         }
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id");
         if (taskId && (e as DragEvent).dataTransfer) {
-          _dragTaskId = taskId;
-          _dragSourceCol = (e.currentTarget as HTMLElement).closest(".kanban-col-body")?.getAttribute("data-column") || null;
           (e as DragEvent).dataTransfer!.setData("text/plain", taskId);
           (e as DragEvent).dataTransfer!.effectAllowed = "move";
         }
@@ -221,15 +215,16 @@ async function loadBoard(): Promise<void> {
       });
       col.addEventListener("drop", async (e) => {
         e.preventDefault();
-        // Use module-level drag state (reliable across all browsers)
-        const taskId = _dragTaskId;
-        const sourceCol = _dragSourceCol;
-        if (!taskId || sourceCol === null) return;
-        _dragTaskId = null;
-        _dragSourceCol = null;
+        const taskId = (e as DragEvent).dataTransfer?.getData("text/plain");
+        if (!taskId) return;
         const colBody = (e.currentTarget as HTMLElement).closest(".kanban-col-body");
         const newStatus = colBody?.getAttribute("data-column");
         if (!newStatus) return;
+
+        // Determine source column by looking at the card's current DOM position
+        const dragCard = document.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`);
+        const sourceCol = dragCard?.closest(".kanban-col-body")?.getAttribute("data-column") || null;
+        // If we can't determine source column, treat as cross-column move
 
         // Intra-column reorder: drop in same column
         if (sourceCol === newStatus) {
