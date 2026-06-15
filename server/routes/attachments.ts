@@ -7,29 +7,12 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 
 const KANBAN_DB = "/data/kanban.db";
-const UPLOADS_DIR = process.env.KANBAN_UPLOADS_DIR || "/data/uploads/kanban";
-
-// ── Unsafe file extensions ──
-// Files that could be potentially dangerous — if detected, the task is moved to Blocked
-const UNSAFE_EXTENSIONS = new Set([
-  ".exe", ".bat", ".cmd", ".com", ".msi", ".scr",
-  ".ps1", ".psm1", ".psd1", ".vbs", ".vbe",
-  ".js", ".jse", ".jar", ".dll", ".app",
-  ".sh", ".bash", ".bin", ".elf", ".wasm",
-  ".py", ".rb", ".pl", ".php", ".php3", ".php4", ".php5", ".phtml",
-  ".swf", ".hta", ".msc", ".reg", ".scf",
-  ".lnk", ".inf", ".docm", ".xlsm", ".pptm",
-]);
-
-function isUnsafeFile(originalName: string): boolean {
-  const ext = extname(originalName).toLowerCase();
-  return UNSAFE_EXTENSIONS.has(ext);
-}
+const UPLOADS_DIR = process.env.KANBAN_UPLOADS_DIR || "/opt/data/uploads/kanban";
 
 // ── DB helpers (matching kanban.ts pattern) ──
 
 function shellQuote(s: string): string {
-  const escaped = s.replace(/["\\$\\`]/g, "\\$&");
+  const escaped = s.replace(/["\\$`]/g, "\\$&");
   return `"${escaped}"`;
 }
 
@@ -104,7 +87,6 @@ function ensureAttachmentsSchema(): void {
         filepath      TEXT NOT NULL,
         size          INTEGER NOT NULL,
         mime_type     TEXT NOT NULL DEFAULT 'application/octet-stream',
-        is_unsafe     INTEGER NOT NULL DEFAULT 0,
         uploaded_by   TEXT NOT NULL DEFAULT 'dashboard',
         uploaded_at   INTEGER NOT NULL DEFAULT (unixepoch())
       )
@@ -176,25 +158,21 @@ attachmentsRouter.post(
 
       // Verify task exists
       const task = queryKanban(
-        `SELECT id, status FROM tasks WHERE id = ${sqlQuote(taskId)}`
+        `SELECT id FROM tasks WHERE id = ${sqlQuote(taskId)}`
       );
       if (task.length === 0) {
         res.status(404).json({ error: "Task not found" });
         return;
       }
 
-      let hasUnsafe = false;
       const inserted: any[] = [];
 
       for (const file of files) {
-        const unsafe = isUnsafeFile(file.originalname) ? 1 : 0;
-        if (unsafe) hasUnsafe = true;
-
         const filepath = resolve(file.path);
 
         const sql = `
-          INSERT INTO task_attachments (task_id, original_name, stored_name, filepath, size, mime_type, is_unsafe, uploaded_by)
-          VALUES (${sqlQuote(taskId)}, ${sqlQuote(file.originalname)}, ${sqlQuote(file.filename)}, ${sqlQuote(filepath)}, ${file.size}, ${sqlQuote(file.mimetype)}, ${unsafe}, ${sqlQuote("dashboard")})
+          INSERT INTO task_attachments (task_id, original_name, stored_name, filepath, size, mime_type, uploaded_by)
+          VALUES (${sqlQuote(taskId)}, ${sqlQuote(file.originalname)}, ${sqlQuote(file.filename)}, ${sqlQuote(filepath)}, ${file.size}, ${sqlQuote(file.mimetype)}, ${sqlQuote("dashboard")})
         `;
         execKanban(sql);
 
@@ -209,39 +187,10 @@ attachmentsRouter.post(
           stored_name: file.filename,
           size: file.size,
           mime_type: file.mimetype,
-          is_unsafe: !!unsafe,
         });
       }
 
-      // If any file is unsafe, move the task to "blocked" status
-      if (hasUnsafe) {
-        const currentStatus = task[0].status;
-        if (currentStatus !== "blocked") {
-          const now = Math.floor(Date.now() / 1000);
-          execKanbanRaw(
-            `UPDATE tasks SET status = ${sqlQuote("blocked")} WHERE id = ${sqlQuote(taskId)}`
-          );
-
-          // Add a comment/event about the blocked status
-          const eventPayload = JSON.stringify({
-            reason: "unsafe_attachment",
-            message: "Task blocked due to potentially unsafe file upload. Review and approve before use.",
-            files: files.map((f) => f.originalname),
-          });
-          execKanbanRaw(`
-            INSERT INTO task_events (task_id, kind, payload, created_at)
-            VALUES (${sqlQuote(taskId)}, 'status_blocked', ${sqlQuote(eventPayload)}, ${now})
-          `);
-        }
-      }
-
-      res.status(201).json({
-        attachments: inserted,
-        blocked: hasUnsafe,
-        message: hasUnsafe
-          ? "Potentially unsafe files detected. Task has been moved to Blocked status."
-          : undefined,
-      });
+      res.status(201).json({ attachments: inserted });
     } catch (err: any) {
       console.error("[attachments] Upload error:", err?.message || err);
       res.status(500).json({ error: err.message || "Unknown error" });
@@ -254,7 +203,7 @@ attachmentsRouter.get("/tasks/:taskId/attachments", (req, res) => {
   try {
     const { taskId } = req.params;
     const rows = queryKanban(`
-      SELECT id, original_name, size, mime_type, is_unsafe, uploaded_by, uploaded_at
+      SELECT id, original_name, size, mime_type, uploaded_by, uploaded_at
       FROM task_attachments
       WHERE task_id = ${sqlQuote(taskId)}
       ORDER BY uploaded_at DESC
@@ -333,61 +282,6 @@ attachmentsRouter.delete("/attachments/:id", (req, res) => {
     res.json({ deleted: true });
   } catch (err: any) {
     console.error("[attachments] Delete error:", err?.message || err);
-    res.status(500).json({ error: err.message || "Unknown error" });
-  }
-});
-
-// PATCH /api/attachments/:id/safety — Override safety flag
-attachmentsRouter.patch("/attachments/:id/safety", (req, res) => {
-  try {
-    const rows = queryKanban(
-      `SELECT * FROM task_attachments WHERE id = ${Number(req.params.id)}`
-    );
-    if (rows.length === 0) {
-      res.status(404).json({ error: "Attachment not found" });
-      return;
-    }
-
-    const att = rows[0] as any;
-
-    // Mark as safe
-    execKanbanRaw(
-      `UPDATE task_attachments SET is_unsafe = 0 WHERE id = ${Number(req.params.id)}`
-    );
-
-    // Optionally restore the task to a previous status
-    if (req.body && req.body.restore_status) {
-      const restoreStatus: string = req.body.restore_status;
-      const now = Math.floor(Date.now() / 1000);
-      execKanbanRaw(
-        `UPDATE tasks SET status = ${sqlQuote(restoreStatus)} WHERE id = ${sqlQuote(att.task_id)}`
-      );
-      const eventPayload = JSON.stringify({
-        reason: "safety_override",
-        message: `Safety override applied. Attachment "${att.original_name}" marked safe. Task restored to "${restoreStatus}".`,
-        attachment_id: att.id,
-      });
-      execKanbanRaw(`
-        INSERT INTO task_events (task_id, kind, payload, created_at)
-        VALUES (${sqlQuote(att.task_id)}, 'safety_override', ${sqlQuote(eventPayload)}, ${now})
-      `);
-      res.json({
-        overridden: true,
-        attachment_id: att.id,
-        original_name: att.original_name,
-        restored_to: restoreStatus,
-      });
-      return;
-    }
-
-    res.json({
-      overridden: true,
-      attachment_id: att.id,
-      original_name: att.original_name,
-      restored_to: null,
-    });
-  } catch (err: any) {
-    console.error("[attachments] Safety override error:", err?.message || err);
     res.status(500).json({ error: err.message || "Unknown error" });
   }
 });

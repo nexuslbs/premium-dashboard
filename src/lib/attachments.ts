@@ -9,7 +9,7 @@ export async function getAttachments(taskId: string): Promise<TaskAttachment[]> 
 export async function uploadAttachments(
   taskId: string,
   files: FileList | File[]
-): Promise<{ attachments: TaskAttachment[]; blocked?: boolean; message?: string }> {
+): Promise<{ attachments: TaskAttachment[] }> {
   const formData = new FormData();
   for (const file of files) {
     formData.append("files", file);

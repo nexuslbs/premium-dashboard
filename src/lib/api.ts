@@ -95,15 +95,12 @@ export interface TaskAttachment {
   stored_name?: string;
   size: number;
   mime_type: string;
-  is_unsafe: number;
   uploaded_by: string;
   uploaded_at: number;
 }
 
 export interface TaskAttachmentUploadResponse {
   attachments: TaskAttachment[];
-  blocked?: boolean;
-  message?: string;
 }
 
 export interface AgentSessionSummary {

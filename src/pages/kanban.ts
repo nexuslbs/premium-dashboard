@@ -808,7 +808,7 @@ async function loadAttachments(): Promise<void> {
         <span class="attachment-icon">${getFileIcon(att.mime_type)}</span>
         <div class="attachment-info">
           <a href="${getDownloadUrl(att.id)}" class="attachment-name" target="_blank">${att.original_name}</a>
-          <span class="attachment-meta">${formatFileSize(att.size)} · ${new Date(att.uploaded_at * 1000).toLocaleDateString()}${att.is_unsafe ? ' · <span style="color:var(--accent-rose);">⚠ Unsafe</span>' : ""}</span>
+          <span class="attachment-meta">${formatFileSize(att.size)} · ${new Date(att.uploaded_at * 1000).toLocaleDateString()}</span>
         </div>
         <button class="attachment-delete" data-id="${att.id}" title="Delete attachment">🗑</button>
       </div>
@@ -834,11 +834,8 @@ async function loadAttachments(): Promise<void> {
 async function handleAttachmentUpload(files: FileList | File[]): Promise<void> {
   if (!_currentAttachmentTaskId) return;
   try {
-    const result = await uploadAttachments(_currentAttachmentTaskId, files);
+    await uploadAttachments(_currentAttachmentTaskId, files);
     loadAttachments();
-    if (result.blocked) {
-      alert(result.message || "Potentially unsafe files detected. Task has been moved to Blocked status.");
-    }
   } catch (err: any) {
     alert(`Upload failed: ${err.message}`);
   }
