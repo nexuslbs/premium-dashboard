@@ -14,6 +14,7 @@ let currentFilters: {
   subtype: string;
   provider: string;
   model: string;
+  message_id: string;
 } = {
   agents: [],
   session: "all",
@@ -21,9 +22,50 @@ let currentFilters: {
   subtype: "",
   provider: "all",
   model: "all",
+  message_id: "all",
 };
 
 let allFilters: AgentFilters | null = null;
+
+// ── URL search param sync ──
+function syncFiltersToUrl(): void {
+  const params = new URLSearchParams();
+  if (currentFilters.agents.length > 0) {
+    for (const a of currentFilters.agents) params.append("agent", a);
+  }
+  if (currentFilters.session !== "all") params.set("session", currentFilters.session);
+  if (currentFilters.types.length > 0) {
+    for (const t of currentFilters.types) params.append("type", t);
+  }
+  if (currentFilters.subtype) params.set("subtype", currentFilters.subtype);
+  if (currentFilters.provider !== "all") params.set("provider", currentFilters.provider);
+  if (currentFilters.model !== "all") params.set("model", currentFilters.model);
+  if (currentFilters.message_id !== "all") params.set("message_id", currentFilters.message_id);
+  if (currentOffset > 0) params.set("offset", String(currentOffset));
+  const qs = params.toString();
+  const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  history.replaceState(null, "", newUrl);
+}
+
+function applyFiltersFromUrl(): void {
+  const p = new URLSearchParams(window.location.search);
+  const agents = p.getAll("agent").filter((v) => v !== "all");
+  if (agents.length > 0) currentFilters.agents = agents;
+  const session = p.get("session");
+  if (session) currentFilters.session = session;
+  const types = p.getAll("type").filter((v) => v !== "all");
+  if (types.length > 0) currentFilters.types = types;
+  const subtype = p.get("subtype");
+  if (subtype) currentFilters.subtype = subtype;
+  const provider = p.get("provider");
+  if (provider) currentFilters.provider = provider;
+  const model = p.get("model");
+  if (model) currentFilters.model = model;
+  const messageId = p.get("message_id");
+  if (messageId === "null" || messageId === "non-null") currentFilters.message_id = messageId;
+  const offset = p.get("offset");
+  if (offset) currentOffset = parseInt(offset, 10) || 0;
+}
 
 // ── Agent role colors ──
 const AGENT_COLORS: Record<string, string> = {
@@ -98,6 +140,18 @@ export function renderAgents(container: HTMLElement): void {
           <option value="all">All</option>
         </select>
       </div>
+      <div class="filter-section">
+        <label class="filter-label">Message ID</label>
+        <select class="filter-select" id="filter-message-id">
+          <option value="all">All</option>
+          <option value="null">Only NULL</option>
+          <option value="non-null">Only non-null</option>
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-secondary" id="btn-refresh">⟳ Refresh</button>
+        <button class="btn btn-secondary" id="btn-reset">✕ Reset</button>
+      </div>
     </div>
     <div class="events-count" id="events-count"></div>
     <div class="card">
@@ -131,8 +185,12 @@ export function renderAgents(container: HTMLElement): void {
     subtype: "",
     provider: "all",
     model: "all",
+    message_id: "all",
   };
+  currentOffset = 0;
   allFilters = null;
+
+  applyFiltersFromUrl();
 
   loadFilters();
 }
@@ -142,6 +200,7 @@ async function loadFilters(): Promise<void> {
   try {
     allFilters = await apiGet<AgentFilters>("/agents/filters");
     populateFilterControls();
+    syncFilterStateToControls();
     loadEvents();
   } catch (e) {
     console.error("Failed to load filters:", e);
@@ -296,6 +355,34 @@ function wireFilterEvents(): void {
     loadEvents();
   });
 
+  // Message ID select
+  document.getElementById("filter-message-id")!.addEventListener("change", (e) => {
+    currentFilters.message_id = (e.target as HTMLSelectElement).value;
+    loadEvents();
+  });
+
+  // Refresh button
+  document.getElementById("btn-refresh")!.addEventListener("click", () => {
+    loadEvents();
+  });
+
+  // Reset button
+  document.getElementById("btn-reset")!.addEventListener("click", () => {
+    currentFilters = {
+      agents: [],
+      session: "all",
+      types: [],
+      subtype: "",
+      provider: "all",
+      model: "all",
+      message_id: "all",
+    };
+    currentOffset = 0;
+    syncFilterStateToControls();
+    history.replaceState(null, "", window.location.pathname);
+    loadEvents();
+  });
+
   // Pagination
   document.getElementById("prev-page")!.addEventListener("click", () => {
     if (currentOffset > 0) {
@@ -323,6 +410,49 @@ function wireFilterEvents(): void {
 let currentOffset = 0;
 const currentLimit = 200;
 let currentTotal = 0;
+
+// ── Sync filter controls to currentFilters state ──
+function syncFilterStateToControls(): void {
+  // Session select
+  const sessionSel = document.getElementById("filter-session") as HTMLSelectElement | null;
+  if (sessionSel) sessionSel.value = currentFilters.session;
+
+  // Subtype input
+  const subtypeInput = document.getElementById("filter-subtype") as HTMLInputElement | null;
+  if (subtypeInput) subtypeInput.value = currentFilters.subtype;
+
+  // Provider select
+  const providerSel = document.getElementById("filter-provider") as HTMLSelectElement | null;
+  if (providerSel) providerSel.value = currentFilters.provider;
+
+  // Model select
+  const modelSel = document.getElementById("filter-model") as HTMLSelectElement | null;
+  if (modelSel) modelSel.value = currentFilters.model;
+
+  // Message ID select
+  const msgIdSel = document.getElementById("filter-message-id") as HTMLSelectElement | null;
+  if (msgIdSel) msgIdSel.value = currentFilters.message_id;
+
+  // Agent toggle buttons
+  document.querySelectorAll(".agent-filter-btn").forEach((btn) => {
+    const role = (btn as HTMLElement).getAttribute("data-agent") || "";
+    if (role === "all") {
+      btn.classList.toggle("selected", currentFilters.agents.length === 0);
+    } else {
+      btn.classList.toggle("selected", currentFilters.agents.includes(role));
+    }
+  });
+
+  // Type toggle buttons
+  document.querySelectorAll(".type-filter-btn").forEach((btn) => {
+    const type = (btn as HTMLElement).getAttribute("data-type") || "";
+    if (type === "all") {
+      btn.classList.toggle("selected", currentFilters.types.length === 0);
+    } else {
+      btn.classList.toggle("selected", currentFilters.types.includes(type));
+    }
+  });
+}
 
 // ── Load events ──
 async function loadEvents(): Promise<void> {
@@ -367,6 +497,7 @@ async function loadEvents(): Promise<void> {
     }
     params.set("provider", currentFilters.provider);
     params.set("model", currentFilters.model);
+    params.set("message_id", currentFilters.message_id);
 
     const data = await apiGet<AgentEventsResponse>(
       `/agents/events?${params.toString()}`,
@@ -436,6 +567,9 @@ async function loadEvents(): Promise<void> {
         }
       });
     });
+
+    // Sync current filters to URL search params
+    syncFiltersToUrl();
   } catch (e) {
     eventsList.innerHTML = `<div class="error-state">Failed to load events: ${e instanceof Error ? e.message : "Unknown error"}</div>`;
   }
