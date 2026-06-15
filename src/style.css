@@ -1310,6 +1310,12 @@ tr:hover td {
   opacity: 1;
 }
 
+/* Kanban modal select styling — dark theme for dropdown options */
+.kanban-modal-select option {
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
 /* Markdown rendered content */
 .markdown-content {
   padding: 1.5rem 2rem;

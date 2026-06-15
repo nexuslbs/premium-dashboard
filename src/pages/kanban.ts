@@ -32,7 +32,7 @@ export function renderKanban(container: HTMLElement): void {
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Priority</label>
-            <select id="task-create-priority" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-create-priority" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="0">Low</option>
               <option value="1">Med</option>
               <option value="3">High</option>
@@ -41,7 +41,7 @@ export function renderKanban(container: HTMLElement): void {
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Board</label>
-            <select id="task-create-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-create-status" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="backlog">Backlog</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
@@ -420,7 +420,7 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Priority</label>
-            <select id="task-edit-priority" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-edit-priority" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="0">Low</option>
               <option value="1">Med</option>
               <option value="3">High</option>
@@ -429,7 +429,7 @@ export function renderKanbanDetail(container: HTMLElement, taskId: string): void
           </div>
           <div>
             <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">Status</label>
-            <select id="task-edit-status" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
+            <select id="task-edit-status" class="kanban-modal-select" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:inherit;font-size:0.85rem;box-sizing:border-box;">
               <option value="backlog">Backlog</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
