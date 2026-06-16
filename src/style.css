@@ -1536,6 +1536,16 @@ tr:hover td {
   background: rgba(255,255,255,0.06);
 }
 
+/* Smaller padding in filter context to match adjacent filter elements */
+.filter-bar .select-trigger {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.filter-bar .custom-select {
+  min-width: 160px;
+}
+
 .select-arrow {
   font-size: 0.65rem;
   color: var(--text-muted);
@@ -1552,12 +1562,14 @@ tr:hover td {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  right: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 360px;
   background: #1a1a2e;
   border: 1px solid var(--glass-border);
   border-radius: 6px;
   z-index: 1001;
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
