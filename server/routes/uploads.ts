@@ -1,8 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
-import { existsSync, mkdirSync, readdirSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, lstatSync } from "fs";
+import { join, resolve, normalize } from "path";
 
 const UPLOADS_DIR = "/tmp/data/user/uploads";
+const USER_DIR = "/tmp/data/user";
 
 // Ensure uploads directory exists on module init
 if (!existsSync(UPLOADS_DIR)) {
@@ -106,3 +108,74 @@ uploadsRouter.post(
     }
   }
 );
+
+// GET /api/uploads/list — List files and directories in /tmp/data/user/
+uploadsRouter.get("/uploads/list", (_req, res) => {
+  try {
+    let entries: { name: string; type: "file" | "directory"; size: number; modified_at: string }[] = [];
+
+    try {
+      const names = readdirSync(USER_DIR);
+      for (const name of names) {
+        const fullPath = join(USER_DIR, name);
+        try {
+          const stat = lstatSync(fullPath);
+          entries.push({
+            name,
+            type: stat.isDirectory() ? "directory" : "file",
+            size: stat.size,
+            modified_at: stat.mtime.toISOString(),
+          });
+        } catch {
+          // Skip entries that can't be stat'd
+        }
+      }
+    } catch {
+      // Directory doesn't exist yet — return empty
+    }
+
+    // Sort: directories first, then alphabetical
+    entries.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    res.json({ entries, path: USER_DIR });
+  } catch (err: any) {
+    console.error("[uploads] List error:", err?.message || err);
+    res.status(500).json({ error: err.message || "Unknown error" });
+  }
+});
+
+// DELETE /api/uploads/delete — Delete a file or empty directory
+uploadsRouter.delete("/uploads/delete", (req, res) => {
+  try {
+    const { path: filePath } = req.query as { path?: string };
+
+    if (!filePath || typeof filePath !== "string") {
+      res.status(400).json({ error: "Query parameter 'path' is required" });
+      return;
+    }
+
+    // Path traversal prevention: resolve and verify it's under USER_DIR
+    const resolvedPath = resolve(join(USER_DIR, filePath));
+    const normalizedBase = normalize(USER_DIR);
+
+    if (!resolvedPath.startsWith(normalizedBase)) {
+      res.status(403).json({ error: "Access denied: path traversal detected" });
+      return;
+    }
+
+    if (!existsSync(resolvedPath)) {
+      res.status(404).json({ error: "File or directory not found" });
+      return;
+    }
+
+    rmSync(resolvedPath, { recursive: true, force: false });
+
+    res.json({ deleted: true, path: filePath });
+  } catch (err: any) {
+    console.error("[uploads] Delete error:", err?.message || err);
+    res.status(500).json({ error: err.message || "Unknown error" });
+  }
+});

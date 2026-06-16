@@ -3,6 +3,11 @@ import { marked, Renderer } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 
+// Functions exposed by the global upload feature (defined in index.ts — same bundle)
+declare function checkExistingFiles(files: File[]): Promise<Set<string>>;
+declare function showUploadModal(files: File[], existingSet: Set<string>): void;
+declare function showToast(message: string, type?: "success" | "error"): void;
+
 // ── Markdown renderer (uses marked — battle-tested GFM parser) ──
 // Configure highlight.js and marked-highlight plugin
 hljs.configure({ ignoreUnescapedHTML: true });
@@ -144,6 +149,15 @@ export function renderSearch(container: HTMLElement): void {
         <div class="explorer-tree" id="explorer-tree">
           <div class="loading">Loading</div>
         </div>
+        <div class="user-uploads-section" id="user-uploads-section">
+          <div class="user-uploads-header" id="user-uploads-header">
+            <span class="user-uploads-title">📤 User Uploads</span>
+            <button class="user-uploads-refresh" id="user-uploads-refresh" title="Refresh uploads">🔄</button>
+          </div>
+          <div class="user-uploads-list" id="user-uploads-list">
+            <div class="loading">Loading</div>
+          </div>
+        </div>
       </div>
       <div class="content-panel">
         <div class="search-bar">
@@ -186,6 +200,91 @@ export function renderSearch(container: HTMLElement): void {
       showUploadModal(fileArray, existingSet);
     }
   });
+
+  // ── User Uploads section ──
+
+  async function loadUserUploads(): Promise<void> {
+    const listEl = document.getElementById("user-uploads-list")!;
+    listEl.innerHTML = '<div class="loading">Loading</div>';
+    try {
+      const res = await fetch("/api/uploads/list");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const entries: { name: string; type: string; size: number; modified_at: string }[] = data.entries || [];
+
+      if (entries.length === 0) {
+        listEl.innerHTML = '<div class="empty-state" style="padding:0.75rem;text-align:center;color:var(--text-muted);font-size:0.8rem;">No uploads yet</div>';
+        return;
+      }
+
+      listEl.innerHTML = entries.map((entry) => {
+        const icon = entry.type === "directory" ? "📁" : "📄";
+        const sizeStr = entry.type === "file"
+          ? (entry.size > 1024 * 1024
+              ? `${(entry.size / (1024 * 1024)).toFixed(1)} MB`
+              : `${(entry.size / 1024).toFixed(0)} KB`)
+          : "";
+        return `<div class="upload-entry-row" data-name="${entry.name}" data-type="${entry.type}">
+          <span class="upload-entry-icon">${icon}</span>
+          <span class="upload-entry-name">${entry.name}</span>
+          <span class="upload-entry-size">${sizeStr}</span>
+          <button class="upload-entry-delete" data-name="${entry.name}" title="Delete ${entry.name}">🗑️</button>
+        </div>`;
+      }).join("");
+
+      // Wire delete buttons
+      listEl.querySelectorAll(".upload-entry-delete").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const name = (btn as HTMLElement).dataset.name || "";
+          const type = (btn as HTMLElement).closest(".upload-entry-row")?.getAttribute("data-type") || "file";
+          showDeleteConfirm(name, type);
+        });
+      });
+    } catch (err: any) {
+      listEl.innerHTML = `<div class="error-state" style="padding:0.75rem;text-align:center;color:var(--accent-rose);font-size:0.8rem;">Failed to load: ${err.message || "Unknown error"}</div>`;
+    }
+  }
+
+  function showDeleteConfirm(name: string, type: string): void {
+    const backdrop = document.createElement("div");
+    backdrop.className = "upload-modal-backdrop";
+    backdrop.innerHTML = `<div class="upload-modal" style="max-width:400px;">
+      <h2 style="margin-bottom:12px;">Delete ${type === "directory" ? "Folder" : "File"}</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px;">
+        Are you sure you want to delete <strong style="color:var(--text-primary);">${name}</strong>?
+        ${type === "directory" ? "<br/><span style=\"color:var(--accent-amber);\">All contents inside will be deleted.</span>" : ""}
+      </p>
+      <div class="upload-actions">
+        <button class="upload-btn upload-btn-cancel" id="del-cancel">Cancel</button>
+        <button class="upload-btn upload-btn-primary" id="del-confirm" style="background:var(--accent-rose,#ef4444);">Delete</button>
+      </div>
+    </div>`;
+    document.body.appendChild(backdrop);
+
+    backdrop.querySelector("#del-cancel")?.addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector("#del-confirm")?.addEventListener("click", async () => {
+      backdrop.querySelector("#del-confirm")!.textContent = "Deleting...";
+      (backdrop.querySelector("#del-confirm") as HTMLButtonElement).disabled = true;
+      try {
+        const res = await fetch(`/api/uploads/delete?path=${encodeURIComponent(name)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.text()) || "Delete failed");
+        backdrop.remove();
+        if (typeof showToast === "function") showToast(`Deleted ${name}`, "success");
+        loadUserUploads();
+      } catch (err: any) {
+        if (typeof showToast === "function") showToast(err?.message || "Delete failed", "error");
+        backdrop.remove();
+      }
+    });
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.remove(); });
+  }
+
+  // Refresh button for uploads
+  document.getElementById("user-uploads-refresh")!.addEventListener("click", loadUserUploads);
+
+  // Initial load
+  loadUserUploads();
 
   // Explorer collapse/expand toggle
   const explorerPanel = document.getElementById("explorer-panel")!;

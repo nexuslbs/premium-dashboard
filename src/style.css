@@ -1833,7 +1833,8 @@ tr:hover td {
   .explorer-panel.collapsed .explorer-title,
   .explorer-panel.collapsed .explorer-upload-btn,
   .explorer-panel.collapsed .explorer-refresh,
-  .explorer-panel.collapsed .explorer-tree {
+  .explorer-panel.collapsed .explorer-tree,
+  .explorer-panel.collapsed .user-uploads-section {
     display: revert;
   }
   .explorer-panel.collapsed .explorer-toggle svg {
@@ -2709,3 +2710,90 @@ tr:hover td {
 .toast-success { background: #10b981; }
 .toast-error { background: #ef4444; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── User Uploads Section ── */
+.user-uploads-section {
+  border-top: 1px solid var(--border-primary);
+  padding: 0.5rem 0;
+  flex-shrink: 0;
+}
+.user-uploads-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.user-uploads-title {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.user-uploads-refresh {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.user-uploads-refresh:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+.user-uploads-list {
+  font-size: 0.8rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.upload-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0.75rem;
+  transition: background 0.1s;
+}
+.upload-entry-row:hover {
+  background: var(--bg-card-hover);
+}
+.upload-entry-icon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+.upload-entry-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.upload-entry-size {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.upload-entry-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.upload-entry-delete:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* Collapsed state — hide uploads section */
+.explorer-panel.collapsed .user-uploads-section {
+  display: none;
+}
