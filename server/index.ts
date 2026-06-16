@@ -15,6 +15,7 @@ import { healthRouter } from "./routes/health.js";
 import { agentsRouter } from "./routes/agents.js";
 import { kanbanRouter } from "./routes/kanban.js";
 import { attachmentsRouter } from "./routes/attachments.js";
+import { uploadsRouter } from "./routes/uploads.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,7 @@ export function createApp() {
   app.use("/api/agents", agentsRouter);
   app.use("/api/kanban", kanbanRouter);
   app.use("/api", attachmentsRouter);
+  app.use("/api", uploadsRouter);
 
   // Serve static frontend
   const staticDir = join(__dirname, "..", "dist");
