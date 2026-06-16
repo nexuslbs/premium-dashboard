@@ -137,6 +137,8 @@ export function renderSearch(container: HTMLElement): void {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
             <button class="explorer-refresh" id="explorer-refresh" title="Refresh file tree">🔄</button>
+            <button class="explorer-upload-btn" id="explorer-upload-btn" title="Upload files">⬆</button>
+            <input type="file" id="file-upload-input" multiple style="display:none" />
           </div>
         </div>
         <div class="explorer-tree" id="explorer-tree">
@@ -168,6 +170,21 @@ export function renderSearch(container: HTMLElement): void {
     params.delete("file");
     const newUrl = location.pathname + (params.toString() ? "?" + params.toString() : "");
     history.replaceState({}, "", newUrl);
+  });
+
+  // Upload button — opens file chooser
+  const uploadBtn = document.getElementById("explorer-upload-btn")!;
+  const fileInput = document.getElementById("file-upload-input") as HTMLInputElement;
+  uploadBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const files = fileInput.files;
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    fileInput.value = ""; // Reset so re-selecting the same files triggers change again
+    if (typeof checkExistingFiles === "function" && typeof showUploadModal === "function") {
+      const existingSet = await checkExistingFiles(fileArray);
+      showUploadModal(fileArray, existingSet);
+    }
   });
 
   // Explorer collapse/expand toggle
