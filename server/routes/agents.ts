@@ -96,6 +96,7 @@ agentsRouter.get("/events", (req, res) => {
     const subtypeParam = (req.query.subtype as string) || "";
     const providerParam = (req.query.provider as string) || "all";
     const modelParam = (req.query.model as string) || "all";
+    const messageIdParam = (req.query.message_id as string) || "all";
     const limit = Math.min(parseInt((req.query.limit as string) || "200", 10), 1000);
     const offset = parseInt((req.query.offset as string) || "0", 10);
 
@@ -150,6 +151,13 @@ agentsRouter.get("/events", (req, res) => {
     // Model filter
     if (modelParam && modelParam !== "all") {
       conditions.push(`ai.model = ${sq(modelParam)}`);
+    }
+
+    // Message ID filter
+    if (messageIdParam === "null") {
+      conditions.push("ai.message_id IS NULL");
+    } else if (messageIdParam === "non-null") {
+      conditions.push("ai.message_id IS NOT NULL");
     }
 
     const whereClause =
