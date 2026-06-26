@@ -11,6 +11,7 @@ export function renderKanban(container: HTMLElement): void {
       </div>
       <div style="display:flex;align-items:center;gap:0.75rem;">
         <span class="kanban-summary" id="kanban-summary"></span>
+        <a href="/kanban-history" id="kanban-history-btn" style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:var(--accent-indigo, #818cf8);border-radius:6px;padding:0.375rem 0.625rem;cursor:pointer;font-size:0.8rem;font-weight:500;white-space:nowrap;text-decoration:none;">📋 History</a>
         <button id="create-task-btn" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:var(--accent-purple);border-radius:6px;padding:0.375rem 0.75rem;cursor:pointer;font-size:0.8rem;font-weight:500;white-space:nowrap;">+ Create Task</button>
       </div>
     </div>
@@ -82,6 +83,13 @@ export function renderKanban(container: HTMLElement): void {
   document.getElementById("create-task-btn")?.addEventListener("click", () => {
     const modal = document.getElementById("create-task-modal");
     if (modal) modal.style.display = "flex";
+  });
+
+  // Wire up Kanban History link (SPA navigation)
+  document.getElementById("kanban-history-btn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    history.pushState({}, "", "/kanban-history");
+    router.go("kanban-history");
   });
 
   // Wire up file picker for create modal

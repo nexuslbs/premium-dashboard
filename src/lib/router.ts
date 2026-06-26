@@ -5,6 +5,7 @@ import { renderCron, renderCronDetail } from "../pages/cron";
 import { renderSearch } from "../pages/search";
 import { renderAgents, renderAgentDetail } from "../pages/agents";
 import { renderKanban, renderKanbanDetail } from "../pages/kanban";
+import { renderKanbanHistory } from "../pages/kanban-history";
 
 type PageRenderer = (container: HTMLElement) => void;
 type ParamPageRenderer = (container: HTMLElement, param: string) => void;
@@ -27,6 +28,7 @@ const routes: Route[] = [
   { name: "search", handler: renderSearch },
   { name: "agents", handler: renderAgents },
   { name: "kanban", handler: renderKanban },
+  { name: "kanban-history", handler: renderKanbanHistory },
 ];
 
 const paramRoutes: ParamRoute[] = [
